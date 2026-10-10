@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Painel{% endblock %}
+{% block panel_class %}has-aside{% endblock %}
+{% block content %}
+<div class="dash-main">
+  <div class="page-head">
+    <div>
+      <h1>Painel</h1>
+      <p class="muted small" id="period"></p>
+    </div>
+    <div class="source-dots" id="source-dots" title="Fontes de dados"></div>
+  </div>
+
+  <section class="stat-grid">
+    <div class="card stat"><span class="stat-label">Consultas</span><span class="stat-value" id="st-queries">—</span><span class="stat-sub">no total</span></div>
+    <div class="card stat"><span class="stat-label">Do cache</span><span class="stat-value" id="st-hitrate">—</span><span class="stat-sub" id="st-hits"></span></div>
+    <div class="card stat"><span class="stat-label">Minha base</span><span class="stat-value" id="st-iocs">—</span><span class="stat-sub" id="st-iocs-active"></span></div>
+    <div class="card stat"><span class="stat-label">Cache válido</span><span class="stat-value" id="st-cache">—</span><span class="stat-sub" id="st-cache-ttl"></span></div>
+  </section>
+
+  <div id="chart-days" class="column-chart" aria-label="Consultas por dia"></div>
+
+  <div id="activity"></div>
+</div>
+
+<aside class="dash-aside">
+  <section>
+    <h2>O que você tem verificado?</h2>
+    <div id="chart-verdicts" class="bar-list"></div>
+  </section>
+
+  <section>
+    <h2>Tipos de indicador</h2>
+    <div id="chart-types" class="bar-list"></div>
+  </section>
+
+  <div class="tip-card">
+    <svg width="96" height="64" viewBox="0 0 96 64" aria-hidden="true">
+      <rect x="4" y="26" width="48" height="34" rx="6" fill="#bfc0d1"/>
+      <rect x="10" y="14" width="40" height="18" rx="4" fill="#60519b"/>
+      <rect x="22" y="38" width="12" height="3" rx="1.5" fill="#fff"/>
+      <path d="M74 16l14 6v10c0 9-6 16-14 20-8-4-14-11-14-20V22l14-6z" fill="#dcd8ee" stroke="#60519b" stroke-width="2"/>
+      <path d="M68 33l4 4 8-9" fill="none" stroke="#60519b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <h3 id="tip-title">Monte sua base</h3>
+    <p id="tip-text">Cadastre os indicadores que você encontra em alertas e relatórios para reconhecê-los nas próximas verificações.</p>
+    <a class="btn btn-dark" id="tip-btn" href="{{ url_for('pages.iocs_page') }}">Ver minha base</a>
+  </div>
+</aside>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>{% endblock %}

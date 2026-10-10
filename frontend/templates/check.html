@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Verificar{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Verificar indicadores</h1>
+    <p class="muted">IPs, domínios, URLs, e-mails e hashes (MD5, SHA1, SHA256). Aceita formatos "desarmados", como <code>hxxp://site[.]com</code>.</p>
+  </div>
+</div>
+
+<section class="card">
+  <form id="check-form" class="form">
+    <label>Indicadores (um por linha, até 50)
+      <textarea name="indicators" rows="6" placeholder="198.51.100.23&#10;phishing-login.example&#10;44d88612fea8a8f36de82e1278abb02f" required></textarea>
+    </label>
+    <div class="form-row">
+      <label class="checkbox">
+        <input type="checkbox" name="force_refresh">
+        Ignorar cache e consultar novamente
+      </label>
+      <div class="actions">
+        <button type="button" id="sample-btn" class="btn btn-ghost">Exemplos</button>
+        <button type="submit" class="btn btn-primary" id="check-btn">Verificar</button>
+      </div>
+    </div>
+  </form>
+</section>
+
+<div id="check-summary" class="summary-line"></div>
+<section id="results" class="results"></section>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/check.js') }}"></script>{% endblock %}

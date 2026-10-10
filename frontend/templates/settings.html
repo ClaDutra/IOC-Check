@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Configurações{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Configurações</h1>
+    <p class="muted">Chaves de API, fontes de dados, cache e gerenciamento dos seus dados.</p>
+  </div>
+</div>
+
+<section class="card">
+  <h2>Prazos e desempenho</h2>
+  <p class="muted small">
+    Novos prazos valem a partir de agora: não alteram IOCs já cadastrados nem resultados já guardados no cache.
+  </p>
+  <form id="general-form" class="form form-grid-3"></form>
+</section>
+
+<section class="card">
+  <h2>Chaves de API</h2>
+  <p class="muted small">
+    As chaves salvas aqui ficam no banco de dados e têm prioridade sobre o arquivo .env.
+    Deixe um campo em branco para manter a chave atual. Ao salvar, o cache é limpo para que
+    as próximas consultas já usem as novas chaves.
+  </p>
+  <form id="keys-form">
+    <div class="table-wrap">
+      <table class="table keys-table">
+        <thead><tr><th>Fonte</th><th>Nova chave</th><th>Chave atual</th><th></th></tr></thead>
+        <tbody id="keys-body"></tbody>
+      </table>
+    </div>
+    <div class="actions keys-actions">
+      <button class="btn btn-primary" type="submit">Salvar chaves</button>
+    </div>
+  </form>
+</section>
+
+<section>
+  <div class="page-head section-head">
+    <div>
+      <h2>Fontes de dados</h2>
+      <p class="muted small">Escolha quais fontes participam das verificações. Ao mudar, o cache é limpo.</p>
+    </div>
+  </div>
+  <div id="providers" class="provider-grid"></div>
+</section>
+
+<section class="card danger-zone">
+  <h2>Meus dados</h2>
+  <p class="muted small">Ações permanentes. As configurações e chaves de API não são afetadas.</p>
+  <div class="danger-row">
+    <div>
+      <strong>Limpar base de IOCs</strong>
+      <p class="muted small">Apaga todos os indicadores cadastrados para você recomeçar sua base.</p>
+    </div>
+    <button class="btn btn-danger" data-clear="/api/iocs"
+            data-question="Apagar TODOS os IOCs da sua base? Esta ação não pode ser desfeita.">Limpar base</button>
+  </div>
+  <div class="danger-row">
+    <div>
+      <strong>Limpar histórico</strong>
+      <p class="muted small">Apaga o registro de todas as consultas feitas.</p>
+    </div>
+    <button class="btn btn-danger" data-clear="/api/history"
+            data-question="Apagar todo o histórico de consultas?">Limpar histórico</button>
+  </div>
+  <div class="danger-row">
+    <div>
+      <strong>Esvaziar cache</strong>
+      <p class="muted small">As próximas consultas voltam a chamar as fontes externas.</p>
+    </div>
+    <button class="btn btn-danger" data-clear="/api/cache"
+            data-question="Remover todas as entradas do cache?">Esvaziar cache</button>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/settings.js') }}"></script>{% endblock %}

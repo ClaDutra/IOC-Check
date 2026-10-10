@@ -1,0 +1,77 @@
+{
+  "data": {
+    "requests": [
+      {
+        "request": {
+          "requestId": "3BD3402CC0C9CD0622C2AFA538DB4F40",
+          "documentURL": "http://45.2.24.40:59399/Mozi.m",
+          "request": {"url": "http://45.2.24.40:59399/Mozi.m", "method": "GET"},
+          "type": "Document",
+          "primaryRequest": true
+        },
+        "response": {
+          "response": {
+            "url": "http://45.2.24.40:59399/Mozi.m",
+            "status": 200,
+            "mimeType": "application/zip",
+            "remoteIPAddress": "45.2.24.40",
+            "securityState": "insecure"
+          }
+        }
+      }
+    ],
+    "redirects": []
+  },
+  "lists": {
+    "ips": ["45.2.24.40"],
+    "countries": ["CA"],
+    "domains": [],
+    "urls": ["http://45.2.24.40:59399/Mozi.m"]
+  },
+  "meta": {
+    "processors": {
+      "download": {
+        "data": [
+          {
+            "filename": "Mozi.m",
+            "filesize": 135784,
+            "url": "http://45.2.24.40:59399/Mozi.m",
+            "state": "completed",
+            "mimeType": "application/x-executable",
+            "mimeDescription": "ELF 32-bit MSB executable, MIPS, MIPS-I version 1 (SYSV), statically linked, stripped",
+            "sha256": "4293c1d8574dc87c58360d6bac3daa182f64f7785c9d41da5e0741d2b1817fc7"
+          }
+        ]
+      }
+    }
+  },
+  "page": {
+    "asn": "AS7311",
+    "asnname": "FRONTIER - Frontier Networks Inc, CA",
+    "city": "Montreal",
+    "country": "CA",
+    "domain": "45.2.24.40",
+    "ip": "45.2.24.40",
+    "ptr": "cbl-45-2-24-40.yyz.frontiernetworks.ca",
+    "server": "nginx",
+    "url": "http://45.2.24.40:59399/Mozi.m",
+    "domainAgeDays": 0,
+    "apexDomainAgeDays": 0,
+    "mimeType": "application/zip",
+    "status": "200"
+  },
+  "stats": {"malicious": 0, "securePercentage": 0},
+  "task": {
+    "time": "2026-10-10T19:03:28.580Z",
+    "url": "http://45.2.24.40:59399/Mozi.m",
+    "uuid": "01a12732-6214-75bc-8961-b48c48f3eda0",
+    "reportURL": "https://urlscan.io/result/01a12732-6214-75bc-8961-b48c48f3eda0/",
+    "screenshotURL": "https://urlscan.io/screenshots/01a12732-6214-75bc-8961-b48c48f3eda0.png"
+  },
+  "verdicts": {
+    "overall": {"score": 0, "categories": [], "brands": [], "malicious": false},
+    "urlscan": {"score": 0, "categories": [], "brands": [], "malicious": false},
+    "engines": {"score": 56, "malicious": true, "categories": []},
+    "community": {"score": 0, "votesTotal": 0, "votesMalicious": 0, "votesBenign": 0, "malicious": false}
+  }
+}

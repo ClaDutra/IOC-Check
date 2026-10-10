@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Histórico{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Histórico de consultas</h1>
+    <p class="muted">
+      Todas as suas consultas. A coluna "Resultado de" mostra quando o resultado usado foi armazenado no cache.
+    </p>
+  </div>
+  <div class="actions">
+    <button class="btn btn-danger" id="clear-history-btn">Limpar histórico</button>
+    <a class="btn" id="export-btn" href="/api/history/export">Exportar CSV</a>
+  </div>
+</div>
+
+<section class="card">
+  <form id="filter-form" class="filters">
+    <input name="q" placeholder="Buscar indicador">
+    <select name="verdict">
+      <option value="">Todos os vereditos</option>
+      <option value="malicious">Malicioso</option>
+      <option value="suspicious">Suspeito</option>
+      <option value="clean">Limpo</option>
+      <option value="unknown">Desconhecido</option>
+    </select>
+    <select name="type">
+      <option value="">Todos os tipos</option>
+      <option value="ipv4">IPv4</option><option value="ipv6">IPv6</option>
+      <option value="domain">Domínio</option><option value="url">URL</option>
+      <option value="email">E-mail</option><option value="md5">MD5</option>
+      <option value="sha1">SHA1</option><option value="sha256">SHA256</option>
+    </select>
+    <select name="source">
+      <option value="">Cache e consultas novas</option>
+      <option value="cache">Somente cache</option>
+      <option value="live">Somente consultas novas</option>
+    </select>
+    <button class="btn" type="submit">Filtrar</button>
+  </form>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Data da consulta</th><th>Indicador</th><th>Tipo</th><th>Veredito</th><th>Score</th><th>Origem</th><th>Resultado de</th></tr></thead>
+      <tbody id="history-body"></tbody>
+    </table>
+  </div>
+  <div id="pagination" class="pagination"></div>
+</section>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/history.js') }}"></script>{% endblock %}

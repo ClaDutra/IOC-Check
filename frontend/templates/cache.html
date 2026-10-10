@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Cache{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Cache de consultas</h1>
+    <p class="muted">Resultados armazenados e reaproveitados até expirarem, evitando chamadas repetidas às APIs externas.</p>
+  </div>
+  <div class="actions">
+    <button class="btn" id="purge-btn">Remover expirados</button>
+    <button class="btn btn-danger" id="clear-btn">Esvaziar cache</button>
+  </div>
+</div>
+
+<section class="stat-grid">
+  <div class="card stat"><span class="stat-label">Entradas válidas</span><span class="stat-value" id="c-valid">—</span></div>
+  <div class="card stat"><span class="stat-label">Expiradas</span><span class="stat-value" id="c-expired">—</span></div>
+  <div class="card stat"><span class="stat-label">Reaproveitamentos</span><span class="stat-value" id="c-hits">—</span></div>
+  <div class="card stat"><span class="stat-label">Validade</span><span class="stat-value" id="c-ttl">—</span><span class="stat-sub" id="c-oldest"></span></div>
+</section>
+
+<section class="card">
+  <form id="filter-form" class="filters">
+    <input name="q" placeholder="Buscar indicador">
+    <select name="status">
+      <option value="">Válidas e expiradas</option>
+      <option value="valid">Somente válidas</option>
+      <option value="expired">Somente expiradas</option>
+    </select>
+    <button class="btn" type="submit">Filtrar</button>
+  </form>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Indicador</th><th>Tipo</th><th>Veredito</th><th>Armazenado em</th><th>Expira em</th><th>Status</th><th>Reusos</th><th></th></tr></thead>
+      <tbody id="cache-body"></tbody>
+    </table>
+  </div>
+  <div id="pagination" class="pagination"></div>
+</section>
+
+<dialog id="detail-dialog" class="dialog">
+  <div class="card-head">
+    <h2 id="detail-title">Detalhes</h2>
+    <button class="btn btn-ghost btn-sm" id="detail-close">Fechar</button>
+  </div>
+  <div id="detail-body"></div>
+</dialog>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/cache.js') }}"></script>{% endblock %}

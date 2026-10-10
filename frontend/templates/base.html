@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}IOC Check{% endblock %} · IOC Check</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="{{ url_for('pages.dashboard') }}">
+        <span class="brand-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/>
+            <circle cx="11.5" cy="11" r="2.6"/>
+            <path d="M13.4 12.9l2.1 2.1"/>
+          </svg>
+        </span>
+        <span class="brand-name">IOC Check</span>
+        <span class="brand-sub">Inteligência de ameaças pessoal</span>
+      </a>
+
+      <nav class="nav">
+        <a href="{{ url_for('pages.dashboard') }}" class="{{ 'active' if active == 'dashboard' }}">Painel</a>
+        <a href="{{ url_for('pages.check_page') }}" class="{{ 'active' if active == 'check' }}">Verificar</a>
+        <a href="{{ url_for('pages.iocs_page') }}" class="{{ 'active' if active == 'iocs' }}">Minha base</a>
+        <a href="{{ url_for('pages.history_page') }}" class="{{ 'active' if active == 'history' }}">Histórico</a>
+        <a href="{{ url_for('pages.cache_page') }}" class="{{ 'active' if active == 'cache' }}">Cache</a>
+        <a href="{{ url_for('pages.settings_page') }}" class="{{ 'active' if active == 'settings' }}">Configurações</a>
+      </nav>
+
+      <a class="sidebar-cta" href="{{ url_for('pages.check_page') }}">+ Nova verificação</a>
+    </aside>
+
+    <main class="panel {% block panel_class %}{% endblock %}">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

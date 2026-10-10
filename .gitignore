@@ -1,0 +1,18 @@
+# Ambiente Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Banco de dados local (contém sua base, histórico e chaves de API)
+backend/instance/
+*.db
+
+# Configuração com segredos
+.env
+
+# Editores e ferramentas
+.vscode/
+.idea/
+.claude/

@@ -145,7 +145,7 @@ de cada página consome essa API com `fetch()` e monta a interface.
 **1. Clone o repositório**
 
 ```bash
-git clone https://github.com/SEU-USUARIO/ioc-check.git
+git clone https://github.com/ClaDutra/IOC-Check.git
 ```
 
 ```bash

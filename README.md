@@ -47,11 +47,12 @@ O **IOC Check** resolve isso em uma única aplicação web que roda no seu compu
   em relatórios (`hxxp://site[.]com`, `1.2.3[.]4`);
 - 📚 cruza com uma **base local** que você mesmo monta, com severidade, tags e
   **prazo de expiração** para cada IOC;
-- 🌐 consulta até **cinco fontes externas**: VirusTotal, AbuseIPDB, ThreatFox,
-  Hybrid Analysis e URLScan.io;
+- 🌐 consulta até **sete fontes externas**: VirusTotal, AbuseIPDB, ThreatFox,
+  Hybrid Analysis, URLScan.io, MxToolbox e IPinfo;
 - ⚡ guarda os resultados em **cache com data de armazenamento e de expiração**,
   evitando chamadas repetidas às APIs;
-- 🕓 registra **todo o histórico** de consultas, com exportação em CSV.
+- 🕓 registra **todo o histórico** de consultas com os dados completos de cada fonte e os prints,
+  e exporta só as consultas e o conteúdo que você escolher (CSV, JSON e imagens).
 
 > Projeto desenvolvido para a disciplina **Projeto de Extensão em Software Fullstack**,
 > integrando front-end, back-end e banco de dados.
@@ -63,9 +64,8 @@ O **IOC Check** resolve isso em uma única aplicação web que roda no seu compu
 | **Painel** | Estatísticas, gráfico de consultas dos últimos 14 dias, atividade recente agrupada por dia, distribuição por veredito e tipo, status das fontes e dicas contextuais |
 | **Verificar** | Detecção automática do tipo, normalização, veredito consolidado com score de 0 a 100, detalhe fonte por fonte com link para o relatório original e atalho para adicionar o indicador à sua base |
 | **Minha base** | Cadastro, edição e exclusão de IOCs com severidade, tags, fonte e validade; filtros (ativos, expirados, vencendo em 7 dias, desativados); renovação; remoção dos expirados; botão **Limpar base** |
-| **Histórico** | Todas as consultas, indicando se vieram do cache e quando o resultado foi armazenado; filtros; exportação CSV; limpeza |
-| **Cache** | Entradas armazenadas com data de armazenamento, expiração e número de reusos; detalhes; remoção de expirados ou de todo o cache |
-| **Configurações** | Chaves de API (mascaradas, com teste de conexão), ativar/desativar cada fonte, validade do cache, validade padrão dos IOCs, tempo limite e a seção **Meus dados** |
+| **Histórico** | Todas as consultas com os **dados completos e os prints** (mesmo depois que o cache expira); detalhes de cada consulta; filtros; seleção de consultas; exportação escolhendo o conteúdo (resumo CSV, fontes CSV, JSON, prints de evidência e das páginas); exclusão de selecionadas; limpeza |
+| **Configurações** | Chaves de API (mascaradas, com teste de conexão), ativar/desativar cada fonte, tempo que cada IOC pesquisado fica no **cache** (padrão 24h) com o resumo do cache, validade padrão dos IOCs, tempo limite e a seção **Meus dados** |
 
 ## Tecnologias
 
@@ -87,7 +87,6 @@ IOC Check/
 │   │   ├── check.html          #   Verificar
 │   │   ├── iocs.html           #   Minha base
 │   │   ├── history.html        #   Histórico
-│   │   ├── cache.html          #   Cache
 │   │   └── settings.html       #   Configurações
 │   └── static/
 │       ├── css/style.css       # Estilo e paleta de cores
@@ -104,7 +103,10 @@ IOC Check/
 │   │       ├── checker.py      #   fluxo de verificação e veredito
 │   │       ├── cache.py        #   leitura, gravação e expiração do cache
 │   │       ├── providers.py    #   integrações com as 5 fontes externas
+│   │       ├── quota.py        #   respeito aos limites dos planos gratuitos
 │   │       ├── report_parsers.py #   leitura detalhada dos relatórios (downloads, redirecionamentos...)
+│   │       ├── evidence.py     #   resumos em imagem (PNG) para copiar e colar
+│   │       ├── page_capture.py #   print da página pública de cada fonte
 │   │       └── settings.py     #   configurações salvas no banco
 │   ├── tests/                  # Testes automatizados (pytest)
 │   ├── instance/               # Banco SQLite (criado automaticamente, fora do Git)
@@ -114,6 +116,9 @@ IOC Check/
 │   ├── pytest.ini
 │   └── .env.example
 │
+├── iniciar.bat                 # Inicia o app em segundo plano com dois cliques (Windows)
+├── parar.bat                   # Encerra o app (o mesmo que o botão "Encerrar IOC Check")
+├── iniciar.sh                  # Inicia o app com um comando (Linux/macOS)
 └── README.md
 ```
 
@@ -140,19 +145,33 @@ de cada página consome essa API com `fetch()` e monta a interface.
 
 ## Como executar
 
-**Requisitos:** Python 3.10 ou superior.
-
-**1. Clone o repositório**
+**Requisitos:** Python 3.10 ou superior ([download](https://www.python.org/downloads/) —
+no Windows, marque "Add Python to PATH" durante a instalação).
 
 ```bash
 git clone https://github.com/ClaDutra/IOC-Check.git
 ```
 
-```bash
-cd ioc-check
-```
+### Jeito fácil: um clique
 
-**2. Crie e ative o ambiente virtual**
+- **Windows:** dê dois cliques em **`iniciar.bat`**, na pasta do projeto.
+- **Linux/macOS:** execute `sh iniciar.sh`.
+
+O script confere o Python, cria o ambiente virtual e instala as dependências (só na
+primeira vez), inicia o servidor **em segundo plano** e abre o navegador em
+**http://localhost:5000**. A janela do CMD fecha sozinha e o app continua rodando, sem
+janela aberta. Se o IOC Check já estiver aberto, o script o reinicia para carregar a
+versão mais recente do código.
+
+Para encerrar, clique em **⏻ Encerrar** na barra lateral ou dê dois cliques em
+**`parar.bat`**. As mensagens do servidor ficam em `backend/instance/ioc_check.log`.
+
+> **Levando para outro computador:** não copie nem compacte a pasta `.venv` — ela só
+> funciona no computador onde foi criada. Se ela vier junto por engano, o `iniciar.bat`
+> detecta, recria o ambiente e reinstala as dependências sozinho. Requer Python 3.10+
+> **64 bits** com a opção "Add Python to PATH".
+
+### Passo a passo manual
 
 ```bash
 python -m venv .venv
@@ -170,33 +189,16 @@ No Linux/macOS:
 source .venv/bin/activate
 ```
 
-**3. Instale as dependências**
-
 ```bash
 pip install -r backend/requirements.txt
 ```
-
-**4. (Opcional) Crie o arquivo de configuração**
-
-No Windows:
-
-```bash
-copy backend\.env.example backend\.env
-```
-
-No Linux/macOS:
-
-```bash
-cp backend/.env.example backend/.env
-```
-
-**5. Inicie o servidor**
 
 ```bash
 python backend/run.py
 ```
 
-Acesse **http://localhost:5000**. A base começa vazia para você montar a sua.
+Acesse **http://localhost:5000**. A base começa vazia para você montar a sua. Para
+personalizar a configuração, copie `backend/.env.example` para `backend/.env`.
 
 Para ver o sistema com dados de demonstração, carregue os exemplos:
 
@@ -220,6 +222,8 @@ banco, com prioridade) ou no arquivo `backend/.env`:
 | `THREATFOX_API_KEY` | — | Auth-Key do abuse.ch (ThreatFox) |
 | `HYBRID_ANALYSIS_API_KEY` | — | Chave do Hybrid Analysis |
 | `URLSCAN_API_KEY` | — | Chave do URLScan.io (opcional) |
+| `MXTOOLBOX_API_KEY` | — | Chave da MxToolbox |
+| `IPINFO_API_KEY` | — | Token do IPinfo |
 | `CACHE_TTL_HOURS` | `24` | Validade de um resultado no cache |
 | `CACHE_ERROR_TTL_MINUTES` | `10` | Validade quando alguma fonte falhou |
 | `IOC_DEFAULT_EXPIRATION_DAYS` | `90` | Validade padrão de novos IOCs (`0` = nunca expira) |
@@ -229,31 +233,91 @@ banco, com prioridade) ou no arquivo `backend/.env`:
 
 ## Fontes de dados
 
-| Fonte | Tipos consultados | Chave | O que informa |
+| Fonte | Tipos consultados | Chave | Limite do plano gratuito |
 |---|---|---|---|
-| **Base local** | todos | — | IOCs que você cadastrou |
-| [VirusTotal](https://www.virustotal.com/gui/join-us) | IP, domínio, URL, hashes | obrigatória | Detecções de dezenas de antivírus |
-| [AbuseIPDB](https://www.abuseipdb.com/register) | IP | obrigatória | Denúncias de abuso da comunidade |
-| [ThreatFox](https://auth.abuse.ch/) | IP, domínio, URL, hashes | obrigatória | IOCs de malware, botnets e C2 |
-| [Hybrid Analysis](https://www.hybrid-analysis.com/signup) | IP, domínio, URL, hashes | obrigatória | Relatórios de sandbox |
-| [URLScan.io](https://urlscan.io/user/signup) | IP, domínio, URL, SHA256 | opcional | Varreduras públicas de sites |
+| **Base local** | todos | — | — |
+| [VirusTotal](https://www.virustotal.com/gui/join-us) | IP, domínio, URL, hashes | obrigatória | 4 consultas/min e 500/dia, uso pessoal e não comercial |
+| [AbuseIPDB](https://www.abuseipdb.com/register) | IP | obrigatória | 1.000 consultas/dia |
+| [ThreatFox](https://auth.abuse.ch/) | IP, domínio, URL, hashes | obrigatória (Auth-Key) | uso justo (*fair use*), sem fins comerciais |
+| [Hybrid Analysis](https://www.hybrid-analysis.com/signup) | hashes (MD5, SHA1, SHA256) | obrigatória | chave *restricted*: só buscas, 200/min e 2.000/hora |
+| [URLScan.io](https://urlscan.io/user/signup) | IP, domínio, URL, SHA256 | opcional | 120 buscas/min com chave; não copiar a base em massa |
+| [MxToolbox](https://mxtoolbox.com/User/Api/) | domínio, URL e e-mail (MX, SPF, DMARC); IP (PTR) | obrigatória | 64 consultas DNS/dia e nenhuma de rede: cada domínio usa 3 consultas e cada IP, 1; a blacklist (consulta de rede) não é usada |
+| [IPinfo](https://ipinfo.io/signup) | IP | obrigatória (token) | IPinfo Lite gratuito: ASN, organização e país; o IOC Check limita a 60/min |
 
 Todas têm plano gratuito. Sem nenhuma chave, o IOC Check funciona com a base local e o
 URLScan.io. Use o botão **Testar** em Configurações para validar cada chave.
 
-### Análise detalhada (URLScan.io e AbuseIPDB)
+### Respeito aos limites gratuitos
 
-Além do veredito, essas duas fontes trazem o **comportamento** do indicador. Os
-**alertas** aparecem ao lado do resumo, e o restante fica em **"Mais detalhes"**:
+Toda chamada às fontes externas passa pelo controle de cota
+([`services/quota.py`](backend/app/services/quota.py)), que:
+
+- conta as consultas de cada fonte por minuto e por dia e **não chama a API** quando o
+  limite gratuito é atingido (ex.: a 5ª consulta ao VirusTotal no mesmo minuto);
+- lê os cabeçalhos de limite que as próprias APIs devolvem (`X-RateLimit-*`,
+  `X-Rate-Limit-*`, `api-limits`) e mostra o saldo real da conta em **Configurações**;
+- ao receber **HTTP 429** ("limite atingido"), **pausa a fonte** até o horário de
+  `Retry-After` (no VirusTotal, até a cota diária zerar), em vez de continuar insistindo;
+- guarda no cache, por apenas 10 minutos, os resultados afetados por uma pausa, para
+  consultar de novo assim que a fonte for liberada.
+
+A Hybrid Analysis consulta só hashes porque as chaves gratuitas (*restricted*) não têm
+acesso à busca por IP, domínio ou URL.
+
+### Análise detalhada de cada fonte
+
+Além do veredito, as fontes trazem o **comportamento** do indicador. Os **alertas**
+aparecem ao lado do resumo, e o restante fica em **"Mais detalhes"**:
 
 | Fonte | Alertas | Detalhes |
 |---|---|---|
-| **URLScan.io** (relatório completo da varredura mais recente) | download de arquivo executável ou compactado, redirecionamentos, marca imitada (phishing), classificação dos mecanismos de IA, votos da comunidade, página sem HTTPS, domínio recém-registrado, site servido direto por IP | URL final, título, status HTTP, tipo de conteúdo, IP e localização, ASN, DNS reverso, servidor, nº de requisições, domínios e IPs contatados, captura de tela, **arquivos baixados** (nome, tamanho, tipo e SHA256, com link para verificar o hash) e **cadeia de redirecionamentos** |
-| **AbuseIPDB** | nó de saída Tor, datacenter/hospedagem, lista de permissão, **categorias de abuso** mais denunciadas (força bruta, varredura de portas, phishing...) | país, provedor, domínio, hostnames, tipo de uso, denunciantes distintos, última denúncia e as **5 denúncias mais recentes** com categorias e comentários |
+| **URLScan.io** (relatório completo da varredura mais recente) | download de executável ou arquivo compactado, redirecionamentos, marca imitada (phishing), risco apontado pelos mecanismos de IA, votos da comunidade, página sem HTTPS, domínio recém-registrado, site servido direto por IP | **captura de tela da página** (miniatura clicável), URL final, título, status HTTP, tipo de conteúdo, IP e localização, ASN, DNS reverso, servidor, requisições, domínios e IPs contatados, **arquivos baixados** (com link para verificar o hash) e **cadeia de redirecionamentos** |
+| **VirusTotal** | marca imitada, categoria de risco (phishing, malware...), votos e reputação negativa, domínio criado há poucos dias, classificação da ameaça, regras Sigma graves | **mecanismos que detectaram** e o nome dado à ameaça; IP: ASN, bloco de rede, país, registro regional; domínio: registrador, data de criação, IPs do DNS, certificado HTTPS; URL: título, URL final e redirecionamentos, status HTTP; arquivo: nome, tipo, tamanho, primeiro envio, **veredito das sandboxes** e **regras YARA** |
+| **AbuseIPDB** | nó de saída Tor, datacenter/hospedagem, lista de permissão, **categorias de abuso** mais denunciadas | país, provedor, domínio, hostnames, tipo de uso, versão do IP, confiança de abuso, denunciantes distintos, primeira e última denúncia, **países que mais denunciaram** e as 5 denúncias mais recentes |
+| **MxToolbox** | falhas e avisos nas verificações de MX, SPF e DMARC; DMARC com política `none` (e-mail falsificado não é bloqueado) | servidores MX (ou "MX nulo": o domínio não recebe e-mail), registros SPF e DMARC, DNS reverso (PTR) do IP e a lista de verificações aprovadas, com aviso ou com falha |
+| **IPinfo** | — | ASN, organização dona do bloco, domínio do provedor, país e continente |
+| **ThreatFox** | servidor comprometido, **IOCs de malware hospedados no mesmo IP ou domínio** | tipo de ameaça, malware e apelidos, ficha no Malpedia, primeira e última vez visto, quem reportou, referência, avistamentos, etiquetas e **amostras de malware** (com link para verificar o hash) |
+| **Hybrid Analysis** | veredito da sandbox, **família do malware**, arquivo não executável no ambiente | tipo, tamanho, % de detecção nos antivírus, nomes de envio, datas, etiquetas, votos, scanners consultados e **endereços de onde o arquivo foi baixado** |
 
 Esses sinais também elevam o veredito: uma página que entrega um executável direto
 de um endereço IP, ou que imita uma marca, é classificada como **maliciosa** mesmo
 que a varredura não tenha sido marcada assim.
+
+### Prints de evidência
+
+#### 📸 Print da página da fonte
+
+Em cada fonte com página pública (VirusTotal, AbuseIPDB, ThreatFox, Hybrid Analysis,
+URLScan.io e IPinfo) há o botão **📸 Print da página**. Ao clicar, o IOC Check abre a página da
+fonte para aquele indicador (ex.: `abuseipdb.com/check/<IP>`) numa **janela do Edge ou
+do Chrome**, tira o print da página inteira e fecha a janela. O print aparece em
+miniatura com os botões **📋 Copiar print da página** (cola com Ctrl+V), **⬇ Baixar** e
+**Ver**, e continua disponível nas próximas consultas do mesmo indicador.
+
+- **Verificação humana:** AbuseIPDB e ThreatFox protegem as páginas com a verificação
+  "Confirme que é humano" (Cloudflare). O IOC Check **não contorna** essa proteção: quando
+  ela aparece, a janela fica aberta para **você** clicar na caixa; assim que a página real
+  carrega, o print é feito sozinho. Os cookies ficam no perfil do navegador do IOC Check
+  (`backend/instance/navegador`), então as próximas capturas costumam passar direto.
+- **Versão logada:** se fizer login no site nessa janela (por exemplo, no AbuseIPDB), os
+  próximos prints saem com a sua conta, com o painel completo da página.
+- **Limites respeitados:** o print só é feito quando você pede — equivale a abrir a página
+  uma vez, como faria manualmente. Avisos de cookies são apenas ocultados na imagem.
+
+#### 📋 Resumo e evidência completa
+
+- **📋 Copiar evidência completa** (no topo do resultado): uma imagem com o veredito final
+  e o resumo de todas as fontes;
+- **📋 Copiar resumo** (em cada fonte): um cartão gerado com os dados da API — informações
+  principais, alertas, listas de detalhes e o link da fonte. No URLScan.io, o cartão
+  inclui a captura de tela do site analisado e a cadeia de redirecionamentos
+  (campo `data.redirects` do relatório).
+
+### Modo escuro
+
+O botão **🌙 Modo escuro / ☀️ Modo claro**, na barra lateral, alterna o tema. Na primeira
+visita o IOC Check segue o tema do sistema operacional; depois, a escolha fica salva no
+navegador.
 
 ## Como funciona
 
@@ -274,14 +338,27 @@ que a varredura não tenha sido marcada assim.
 | VirusTotal | 3+ mecanismos maliciosos | 1–2 maliciosos ou 2+ suspeitos |
 | AbuseIPDB | confiança ≥ 75% | confiança ≥ 25% |
 | ThreatFox | registro com confiança ≥ 50% | registro com confiança < 50% |
-| Hybrid Analysis | algum relatório "malicious" | algum relatório "suspicious" |
+| Hybrid Analysis | veredito "malicious" no `/overview` | veredito "suspicious" no `/overview` |
 | URLScan.io | 2+ varreduras maliciosas, marca imitada, ou executável servido por IP / apontado pelos mecanismos | 1 varredura maliciosa, download de executável, ou risco apontado pelos mecanismos de IA |
+
+MxToolbox e IPinfo trazem **contexto** (configuração de e-mail do domínio e dono do IP), não
+reputação: aparecem como "sem veredito" e não alteram o veredito final.
 
 URLs e e-mails também são comparados com o **domínio** cadastrado na base local.
 
-### Cache
+### Cache e histórico
 
-- Validade padrão de 24 horas, reduzida para 10 minutos quando alguma fonte falha.
+- O cache funciona nos bastidores (não tem tela própria): todo IOC pesquisado fica guardado
+  pelo tempo definido em **Configurações** (padrão 24 horas), reduzido para 10 minutos
+  quando alguma fonte falha. O resumo e a limpeza do cache ficam em Configurações.
+- O **histórico** guarda uma cópia completa do resultado de cada consulta, a captura de tela
+  do URLScan.io (copiada para `instance/midias` no momento da consulta) e os prints das
+  páginas das fontes (`instance/capturas`, um por consulta). Assim nada se perde quando o
+  cache expira ou é esvaziado.
+- Os **prints de página** seguem o mesmo prazo do cache: um print tirado dentro do prazo é
+  reaproveitado nas próximas consultas do mesmo indicador (copiado para a nova consulta,
+  mantendo a data original da captura). Depois do prazo, ou ao forçar uma nova consulta,
+  basta tirar um novo print.
 - Alterar um IOC invalida o cache dos indicadores relacionados.
 - Limpar a base remove do cache só os resultados que vieram da base local.
 - Mudar chaves ou ativar/desativar fontes limpa o cache.
@@ -300,8 +377,9 @@ ser considerado nas verificações, mas pode ser renovado com um clique.
 |---|---|
 | `iocs` | `id, value, ioc_type, severity, description, tags, source, active, expires_at, created_at, updated_at` |
 | `cache_entries` | `id, indicator, ioc_type, verdict, score, results_json, stored_at, expires_at, hits` |
-| `query_logs` | `id, indicator, ioc_type, verdict, score, from_cache, cache_stored_at, queried_at` |
+| `query_logs` | `id, indicator, ioc_type, verdict, score, from_cache, cache_stored_at, cache_expires_at, results_json, queried_at` |
 | `settings` | `key, value, updated_at` |
+| `provider_quota` | `provider, day, day_calls, window_start, window_calls, blocked_until, remote_limit, remote_remaining, remote_window` |
 
 ## API REST
 
@@ -314,16 +392,24 @@ ser considerado nas verificações, mas pode ser renovado com um clique.
 | `POST` | `/api/iocs/purge-expired` | Remove os IOCs expirados |
 | `DELETE` | `/api/iocs` | Limpa a base inteira |
 | `GET` | `/api/history` | Histórico (filtros `q`, `verdict`, `type`, `source`) |
-| `GET` | `/api/history/export` | Exporta o histórico em CSV |
-| `DELETE` | `/api/history` | Limpa o histórico |
-| `GET` | `/api/cache` | Entradas do cache + resumo (filtros `q`, `status`) |
-| `GET` `DELETE` | `/api/cache/<id>` | Detalha ou remove uma entrada |
+| `GET` `DELETE` | `/api/history/<id>` | Detalhes completos de uma consulta (com os prints) ou exclusão |
+| `POST` | `/api/history/delete` | Exclui as consultas selecionadas: `{"ids": [1, 2]}` |
+| `GET` | `/api/history/export` | Exporta: `ids=1,2` (sem ids, o filtro atual) e `include=summary,sources,json,evidence,pages` |
+| `DELETE` | `/api/history` | Limpa o histórico (com os prints guardados) |
+| `GET` | `/api/cache/summary` | Resumo do cache (válidas, expiradas, reusos, validade) |
+| `GET` | `/api/cache` | Entradas do cache (filtros `q`, `status`) |
+| `DELETE` | `/api/cache/<id>` | Remove uma entrada |
 | `POST` | `/api/cache/purge-expired` | Remove entradas expiradas |
 | `DELETE` | `/api/cache` | Esvazia o cache |
 | `GET` `PUT` | `/api/settings` | Lê ou salva configurações: `{"values": {...}, "clear": [...]}` |
 | `POST` | `/api/settings/providers/<id>/test` | Testa a conexão com uma fonte |
 | `GET` | `/api/stats` | Estatísticas do Painel |
 | `GET` | `/api/health` | Status do servidor e das fontes |
+| `POST` | `/api/capture/<id>?provider=<fonte>` | Abre a página da fonte e salva o print (pode aguardar a verificação humana) |
+| `GET` | `/api/capture/<id>.png?provider=<fonte>` | Print da página da fonte (`&download=1` para baixar) |
+| `GET` | `/api/evidence/<id>.png` | Print de evidência de uma consulta do histórico (`?provider=<fonte>` para uma fonte só; `&download=1` para baixar) |
+| `GET` | `/api/evidence/screenshot?url=` | Captura de tela do URLScan.io pela cópia local |
+| `POST` | `/api/system/shutdown` | Encerra o IOC Check (botão da barra lateral) |
 
 Requisições `POST`, `PUT` e `DELETE` exigem o cabeçalho `X-Requested-With: IOCCheck`
 (veja [Segurança](#segurança)).
@@ -341,9 +427,10 @@ python -m pytest backend -v
 ```
 
 Os testes cobrem detecção de tipos e refang, cache (reuso, expiração, invalidação e
-limpeza), base local, prazo de expiração dos IOCs, histórico e exportação CSV,
+limpeza), base local, prazo de expiração dos IOCs, histórico completo e exportação seletiva (CSV, JSON e ZIP com imagens),
 estatísticas, configurações, proteção contra requisições de outros sites e a
-interpretação das respostas de cada fonte externa (com as APIs simuladas, sem rede).
+interpretação das respostas de cada fonte externa (com respostas reais salvas como amostra,
+sem acesso à rede), o respeito aos limites dos planos gratuitos e a geração dos prints de evidência.
 
 ## Segurança
 

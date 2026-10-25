@@ -2,7 +2,7 @@ from flask import Blueprint, Response, jsonify, request
 
 from ..extensions import db
 from ..models import QueryLog
-from ..services import history
+from ..services import activity, history
 from .utils import json_body, paginated
 
 bp = Blueprint("history", __name__, url_prefix="/api/history")
@@ -47,6 +47,7 @@ def delete_entry(log_id):
     db.get_or_404(QueryLog, log_id)
     history.delete([log_id])
     db.session.commit()
+    activity.action("histórico", f"Excluiu a consulta {log_id} do histórico")
     return jsonify(message="Consulta removida do histórico")
 
 
@@ -57,6 +58,7 @@ def delete_selected():
         return jsonify(error="Selecione ao menos uma consulta"), 400
     removed = history.delete(ids)
     db.session.commit()
+    activity.action("histórico", f"Excluiu {removed} consulta(s) do histórico")
     return jsonify(removed=removed, message=f"{removed} consulta(s) removida(s) do histórico")
 
 
@@ -64,6 +66,7 @@ def delete_selected():
 def clear_history():
     removed = history.clear_all()
     db.session.commit()
+    activity.action("histórico", f"Limpou o histórico ({removed} consulta(s))", level="aviso")
     return jsonify(removed=removed, message=f"Histórico apagado ({removed} consulta(s))")
 
 
@@ -85,6 +88,8 @@ def export_history():
     if unknown:
         return jsonify(error=f"Conteúdo desconhecido: {', '.join(sorted(unknown))}"), 400
 
-    content, filename, mimetype = history.export(query.limit(history.MAX_EXPORT).all(), parts)
+    logs = query.limit(history.MAX_EXPORT).all()
+    content, filename, mimetype = history.export(logs, parts)
+    activity.action("histórico", f"Exportou {len(logs)} consulta(s): {', '.join(parts)} → {filename}")
     return Response(content, mimetype=mimetype,
                     headers={"Content-Disposition": f'attachment; filename="{filename}"'})

@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify
 
 from ..extensions import db
 from ..ioc_utils import TYPE_LABELS
-from ..services import cache, settings
+from ..services import activity, cache, settings
 from ..services.providers import PROVIDERS, PROVIDERS_BY_ID, TEST_SAMPLES, provider_state, run_provider
 from .utils import json_body
 
@@ -59,6 +59,9 @@ def update_settings():
         cleared = cache.clear_all()
     db.session.commit()
 
+    if changed:
+        # Só os nomes das configurações; os valores das chaves nunca vão para o log
+        activity.action("configurações", "Alterou: " + ", ".join(sorted(changed)), alteradas=sorted(changed))
     if not changed:
         message = "Nenhuma alteração"
     elif cleared:
@@ -78,6 +81,8 @@ def test_provider(provider_id):
     result = run_provider(provider, value, ioc_type, ignore_disabled=True)
     db.session.commit()  # grava o consumo da cota gratuita
     ok = result["status"] in ("ok", "not_found")
+    activity.action("configurações", f"Testou a conexão com {provider.name}: {result['summary']}",
+                    level="info" if ok else "erro")
     if ok:
         message = f"Conexão com {provider.name} funcionando"
     else:

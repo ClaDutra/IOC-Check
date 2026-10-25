@@ -40,7 +40,7 @@ function statusBadgeFor(ioc) {
 function row(ioc) {
   return `
     <tr>
-      <td class="indicator" title="${escapeHtml(ioc.description)}">${escapeHtml(ioc.value)}</td>
+      <td class="indicator" title="${escapeHtml(ioc.description)}"><a href="#" data-action="details" data-id="${ioc.id}">${escapeHtml(ioc.value)}</a></td>
       <td>${typeLabel(ioc.type)}</td>
       <td>${severityBadge(ioc.severity)}</td>
       <td>${ioc.tags.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join("") || '<span class="muted">—</span>'}</td>
@@ -50,6 +50,7 @@ function row(ioc) {
       <td>
         <div class="row-actions">
           ${ioc.expired ? `<button class="btn btn-sm" data-action="renew" data-id="${ioc.id}" title="Renovar por ${defaultExpirationDays || 90} dias">Renovar</button>` : ""}
+          <button class="btn btn-sm btn-primary" data-action="details" data-id="${ioc.id}">Detalhes</button>
           <button class="btn btn-sm" data-action="edit" data-id="${ioc.id}">Editar</button>
           <button class="btn btn-sm btn-danger" data-action="delete" data-id="${ioc.id}">Excluir</button>
         </div>
@@ -71,6 +72,77 @@ async function load(page = 1) {
     toast(err.message, "error");
   }
 }
+
+// --- Detalhes do IOC: dados da base + última verificação completa (com prints) ---
+
+const detailDialog = document.getElementById("detail-dialog");
+
+function detailFact(label, value) {
+  return `<div class="fact"><span>${escapeHtml(label)}</span><strong>${value}</strong></div>`;
+}
+
+async function showDetails(id) {
+  const data = await API.get(`/api/iocs/${id}/details`);
+  const ioc = data.ioc;
+  const latest = data.latest;
+  document.getElementById("detail-title").textContent = ioc.value;
+
+  const facts = [
+    detailFact("Tipo", typeLabel(ioc.type)),
+    detailFact("Severidade", severityBadge(ioc.severity)),
+    detailFact("Status", statusBadgeFor(ioc)),
+    detailFact("Validade", ioc.expires_at ? `${formatDay(ioc.expires_at)} (${relativeTime(ioc.expires_at)})` : "Nunca expira"),
+    detailFact("Fonte", escapeHtml(ioc.source || "—")),
+    detailFact("Tags", ioc.tags.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join("") || "—"),
+    detailFact("Cadastrado em", formatDate(ioc.created_at)),
+    detailFact("Atualizado em", formatDate(ioc.updated_at)),
+  ].join("");
+
+  const latestHtml = latest ? `
+    <section class="detail-section">
+      <div class="card-head">
+        <h3>Última verificação · ${formatDate(latest.queried_at)}</h3>
+        <span>${verdictBadge(latest.verdict)} <span class="muted small">score ${latest.score}/100</span></span>
+      </div>
+      ${evidenceActions(evidenceUrl(latest.id), "evidência completa", true)}
+      <div class="table-wrap provider-table">
+        <table class="table">
+          <thead><tr><th>Fonte</th><th>Status</th><th>Veredito</th><th>Detalhe</th></tr></thead>
+          <tbody>${providerRows(latest.results, latest.id, latest.captures || {})}</tbody>
+        </table>
+      </div>
+    </section>` : `
+    <section class="detail-section">
+      <p class="muted">Este IOC ainda não foi verificado nas fontes. Clique em <strong>Verificar agora</strong>
+        para consultar todas as ferramentas e guardar o resultado.</p>
+    </section>`;
+
+  const queries = data.queries.length ? `
+    <section class="detail-section">
+      <h3>Consultas deste IOC (${data.total_queries})</h3>
+      <ul class="ioc-queries">${data.queries.map((q) => `
+        <li><span>${formatDate(q.queried_at)} · ${q.from_cache ? "do cache" : "consulta nova"}</span>
+            <span>${verdictBadge(q.verdict)} <span class="muted small">score ${q.score}</span></span></li>`).join("")}
+      </ul>
+    </section>` : "";
+
+  document.getElementById("detail-body").innerHTML = `
+    <div class="ioc-detail-head">
+      <a class="btn btn-primary btn-sm" href="/check?q=${encodeURIComponent(ioc.value)}">🔎 Verificar agora</a>
+      <button type="button" class="btn btn-sm" id="detail-edit">Editar</button>
+    </div>
+    ${ioc.description ? `<p>${escapeHtml(ioc.description)}</p>` : ""}
+    <div class="facts">${facts}</div>
+    ${latestHtml}
+    ${queries}`;
+  document.getElementById("detail-edit").addEventListener("click", () => {
+    detailDialog.close();
+    openForm(ioc);
+  });
+  detailDialog.showModal();
+}
+
+document.getElementById("detail-close").addEventListener("click", () => detailDialog.close());
 
 document.getElementById("new-btn").addEventListener("click", () => openForm(null));
 document.getElementById("cancel-btn").addEventListener("click", () => (formCard.hidden = true));
@@ -134,13 +206,16 @@ iocForm.addEventListener("submit", async (event) => {
 });
 
 tbody.addEventListener("click", async (event) => {
-  const button = event.target.closest("button[data-action]");
+  const button = event.target.closest("[data-action]");
   if (!button) return;
+  event.preventDefault();
   const ioc = itemsById[button.dataset.id];
   const action = button.dataset.action;
 
   try {
-    if (action === "edit") {
+    if (action === "details") {
+      await showDetails(ioc.id);
+    } else if (action === "edit") {
       openForm(ioc);
     } else if (action === "renew") {
       await API.put(`/api/iocs/${ioc.id}`, { expires_at: expirationValue(String(defaultExpirationDays || 90)) });

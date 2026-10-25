@@ -137,3 +137,36 @@ def test_reused_print_survives_original_and_force_refresh_skips(app, client, mon
 
     fresh = client.post("/api/check", json={"indicators": "151.243.24.56", "force_refresh": True}).get_json()
     assert fresh["results"][0]["captures"] == {}
+
+
+def test_manual_print_upload(client, monkeypatch):
+    log_id = checked_ip(client, monkeypatch)["history_id"]
+    url = f"/api/capture/{log_id}/manual?provider=AbuseIPDB"
+    data = client.post(url, data={"image": (io.BytesIO(fake_png()), "print.png"),
+                                  "text": "151.243.24.56 was found in our database!"},
+                       content_type="multipart/form-data").get_json()
+    assert data["manual"] is True and data["url"] == "https://www.abuseipdb.com/check/151.243.24.56"
+    assert data["image"] == f"/api/capture/{log_id}.png?provider=AbuseIPDB"
+    assert "found in our database" in client.get(data["text"]).get_data(as_text=True)
+    image = Image.open(io.BytesIO(client.get(data["image"]).data))
+    assert image.format == "PNG" and image.size == (1366, 900)
+    # fica no histórico e é reaproveitado como o cache
+    assert client.get(f"/api/history/{log_id}").get_json()["captures"]["AbuseIPDB"]["manual"] is True
+    again = client.post("/api/check", json={"indicators": "151.243.24.56"}).get_json()["results"][0]
+    assert again["captures"]["AbuseIPDB"]["reused_from"] == log_id
+
+
+def test_manual_print_rejects_bad_input(client, monkeypatch):
+    log_id = checked_ip(client, monkeypatch)["history_id"]
+    url = f"/api/capture/{log_id}/manual?provider=AbuseIPDB"
+    assert client.post(url, data={}, content_type="multipart/form-data").status_code == 400
+    bad = client.post(url, data={"image": (io.BytesIO(b"<script>nao sou imagem</script>"), "x.png")},
+                      content_type="multipart/form-data")
+    assert bad.status_code == 400 and "imagem válida" in bad.get_json()["error"]
+    local = f"/api/capture/{log_id}/manual?provider=Base local"
+    assert client.post(local, data={"image": (io.BytesIO(fake_png()), "p.png")},
+                       content_type="multipart/form-data").status_code == 404
+    jpeg = io.BytesIO()
+    Image.new("RGB", (300, 200), (10, 20, 30)).save(jpeg, format="JPEG")
+    ok = client.post(url, data={"image": (io.BytesIO(jpeg.getvalue()), "p.jpg")}, content_type="multipart/form-data")
+    assert ok.status_code == 200 and "text" not in ok.get_json()  # sem texto enviado, sem texto salvo

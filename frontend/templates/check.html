@@ -26,7 +26,13 @@
   </form>
 </section>
 
-<div id="check-summary" class="summary-line"></div>
+<div class="results-bar">
+  <div id="check-summary" class="summary-line"></div>
+  <div class="actions" id="results-toolbar" hidden>
+    <button type="button" class="btn btn-sm" id="collapse-all-btn">▴ Recolher todos</button>
+    <button type="button" class="btn btn-sm" id="expand-all-btn">▾ Expandir todos</button>
+  </div>
+</div>
 <section id="results" class="results"></section>
 {% endblock %}
 {% block scripts %}<script src="{{ url_for('static', filename='js/check.js') }}"></script>{% endblock %}

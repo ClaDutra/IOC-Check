@@ -13,6 +13,8 @@ import shutil
 import zipfile
 from datetime import datetime
 
+from PIL import Image
+
 from ..extensions import db
 from ..models import CacheEntry, QueryLog, iso, utcnow
 from . import evidence, media, page_capture
@@ -159,11 +161,17 @@ def export(logs, parts):
             folder = _folder(log)
             if "evidence" in parts and log.results:
                 z.writestr(f"evidencias/{folder}/todas-as-fontes.png", evidence.to_png(evidence.render_all(log)))
+                z.writestr(f"evidencias/{folder}/todas-as-fontes.txt", evidence.text_all(log))
                 images += 1
             if "pages" in parts:
                 for result in log.results:
                     png, _meta = page_capture.files(log.id, result.get("provider", ""))
                     if png.exists():
-                        z.write(png, f"paginas/{folder}/{page_capture._slug(result['provider'])}.png")
+                        slug = page_capture._slug(result["provider"])
+                        marked = evidence.watermark(Image.open(io.BytesIO(png.read_bytes())))
+                        z.writestr(f"paginas/{folder}/{slug}.png", evidence.to_png(marked))
+                        text = page_capture.text_file(log.id, result.get("provider", ""))
+                        if text.exists():
+                            z.write(text, f"paginas/{folder}/{slug}.txt")
                         images += 1
     return buffer.getvalue(), f"historico_ioc_{stamp}.zip", "application/zip"

@@ -8,7 +8,7 @@ from flask import Blueprint, jsonify, request
 
 from ..extensions import db
 from ..models import CacheEntry, utcnow
-from ..services import cache
+from ..services import activity, cache
 from .utils import paginated
 
 bp = Blueprint("cache", __name__, url_prefix="/api/cache")
@@ -48,6 +48,7 @@ def delete_entry(entry_id):
 def purge_expired():
     removed = cache.purge_expired()
     db.session.commit()
+    activity.action("cache", f"Removeu {removed} entrada(s) expirada(s) do cache")
     return jsonify(removed=removed, message=f"{removed} entrada(s) expirada(s) removida(s)")
 
 
@@ -55,4 +56,5 @@ def purge_expired():
 def clear_cache():
     removed = cache.clear_all()
     db.session.commit()
+    activity.action("cache", f"Esvaziou o cache ({removed} entrada(s))", level="aviso")
     return jsonify(removed=removed, message=f"Cache esvaziado ({removed} entrada(s))")

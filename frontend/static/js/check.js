@@ -32,7 +32,18 @@ function cacheNote(r) {
           Os dados e os prints ficam guardados no <a href="/history">Histórico</a>.`;
 }
 
-function renderResult(r) {
+// Fontes que deram alerta, mostradas na linha do IOC quando ele está recolhido
+function alertSources(r) {
+  const alerts = r.results.filter((p) => p.status === "ok" && ["malicious", "suspicious"].includes(p.verdict));
+  if (!alerts.length) return '<span class="muted small">nenhuma fonte com alerta</span>';
+  return `<span class="alert-sources">${alerts.map((p) =>
+    `<span class="alert-source ${VERDICTS[p.verdict].cls}" title="${escapeHtml(p.provider)}: ${escapeHtml(VERDICTS[p.verdict].label)}">${sourceIcon(p.provider)}</span>`).join("")}
+    <span class="muted small">${alerts.length} fonte(s) com alerta</span></span>`;
+}
+
+const TOGGLE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+
+function renderResult(r, collapsed = false) {
   if (!r.valid) {
     return `
       <article class="card result">
@@ -48,9 +59,11 @@ function renderResult(r) {
   const canAdd = local && local.status !== "ok";
 
   return `
-    <article class="card result ${verdict.cls}">
-      <div class="result-head">
-        <div>
+    <article class="card result ${verdict.cls}${collapsed ? " collapsed" : ""}">
+      <div class="result-head" data-toggle-result>
+        <button type="button" class="result-toggle" aria-expanded="${!collapsed}"
+                title="${collapsed ? "Expandir" : "Recolher"} este IOC">${TOGGLE_ICON}</button>
+        <div class="result-title">
           <div class="result-value">${escapeHtml(r.indicator)}</div>
           <div class="result-meta">
             <span class="badge neutral">${typeLabel(r.type)}</span>
@@ -58,12 +71,14 @@ function renderResult(r) {
             ${r.from_cache ? '<span class="badge info">Cache</span>' : '<span class="badge neutral">Consulta nova</span>'}
             ${r.input !== r.indicator ? `<span>entrada original: <code>${escapeHtml(r.input)}</code></span>` : ""}
           </div>
+          <div class="result-collapsed-info">${alertSources(r)}</div>
         </div>
         <div class="result-side">
           ${scoreBar(r.score, verdict.cls)}
           ${r.history_id ? evidenceActions(evidenceUrl(r.history_id), "evidência completa", true) : ""}
         </div>
       </div>
+      <div class="result-body">
       <div class="table-wrap provider-table">
         <table class="table">
           <thead><tr><th>Fonte</th><th>Status</th><th>Veredito</th><th>Detalhe</th></tr></thead>
@@ -83,8 +98,37 @@ function renderResult(r) {
           <input name="description" placeholder="Descrição (opcional)">
           <button class="btn btn-sm" type="submit">Adicionar à base local</button>
         </form>` : ""}
+      </div>
     </article>`;
 }
+
+// --- Recolher / expandir IOCs --------------------------------------------------
+
+function setCollapsed(article, collapsed) {
+  article.classList.toggle("collapsed", collapsed);
+  const button = article.querySelector(".result-toggle");
+  if (button) {
+    button.setAttribute("aria-expanded", String(!collapsed));
+    button.title = `${collapsed ? "Expandir" : "Recolher"} este IOC`;
+  }
+}
+
+resultsEl.addEventListener("click", (event) => {
+  const head = event.target.closest("[data-toggle-result]");
+  // cliques em botões, links e formulários do cabeçalho (ex.: copiar evidência) não recolhem
+  if (!head || (event.target.closest("a, button, input, select, label") && !event.target.closest(".result-toggle"))) return;
+  const article = head.closest(".result");
+  setCollapsed(article, !article.classList.contains("collapsed"));
+});
+
+function renderToolbar(count) {
+  document.getElementById("results-toolbar").hidden = count < 1;
+}
+
+document.getElementById("collapse-all-btn").addEventListener("click", () =>
+  resultsEl.querySelectorAll(".result").forEach((a) => setCollapsed(a, true)));
+document.getElementById("expand-all-btn").addEventListener("click", () =>
+  resultsEl.querySelectorAll(".result").forEach((a) => setCollapsed(a, false)));
 
 resultsEl.addEventListener("submit", async (event) => {
   const addForm = event.target.closest(".add-form");
@@ -122,7 +166,9 @@ form.addEventListener("submit", async (event) => {
     const s = data.summary;
     summaryEl.textContent =
       `${s.total} indicador(es) processado(s) · ${s.from_cache} do cache · ${s.invalid} inválido(s)`;
-    resultsEl.innerHTML = data.results.map(renderResult).join("");
+    // Todos os IOCs chegam recolhidos (veredito, score e fontes com alerta); clique para expandir
+    resultsEl.innerHTML = data.results.map((r) => renderResult(r, r.valid)).join("");
+    renderToolbar(data.results.length);
   } catch (err) {
     toast(err.message, "error");
   } finally {

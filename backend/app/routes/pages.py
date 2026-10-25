@@ -32,3 +32,8 @@ def cache_page():
 @bp.get("/settings")
 def settings_page():
     return render_template("settings.html", active="settings")
+
+
+@bp.get("/logs")
+def logs_page():
+    return render_template("logs.html", active="logs")

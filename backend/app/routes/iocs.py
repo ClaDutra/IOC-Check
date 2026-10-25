@@ -5,8 +5,8 @@ from sqlalchemy import or_
 
 from ..extensions import db
 from ..ioc_utils import normalize
-from ..models import Ioc, utcnow
-from ..services import cache, settings
+from ..models import Ioc, QueryLog, utcnow
+from ..services import activity, cache, history, settings
 from .utils import json_body, paginated
 
 bp = Blueprint("iocs", __name__, url_prefix="/api/iocs")
@@ -125,12 +125,28 @@ def create_ioc():
     db.session.add(ioc)
     cache.invalidate_related(ioc.value)
     db.session.commit()
+    activity.action("minha base", f"Cadastrou o IOC {ioc.value} (severidade {ioc.severity})", ioc=ioc.id)
     return jsonify(ioc.to_dict()), 201
 
 
 @bp.get("/<int:ioc_id>")
 def get_ioc(ioc_id):
     return jsonify(db.get_or_404(Ioc, ioc_id).to_dict())
+
+
+@bp.get("/<int:ioc_id>/details")
+def ioc_details(ioc_id):
+    """IOC da base + última verificação completa (com prints) e as consultas anteriores."""
+    ioc = db.get_or_404(Ioc, ioc_id)
+    logs = (QueryLog.query.filter(QueryLog.indicator == ioc.value)
+            .order_by(QueryLog.queried_at.desc(), QueryLog.id.desc()).limit(20).all())
+    latest = next((log for log in logs if log.results_json), None)
+    return jsonify(
+        ioc=ioc.to_dict(),
+        latest=history.detail(latest) if latest else None,
+        queries=[log.to_dict() for log in logs],
+        total_queries=QueryLog.query.filter(QueryLog.indicator == ioc.value).count(),
+    )
 
 
 @bp.put("/<int:ioc_id>")
@@ -145,6 +161,7 @@ def update_ioc(ioc_id):
     cache.invalidate_related(old_value)
     cache.invalidate_related(ioc.value)
     db.session.commit()
+    activity.action("minha base", f"Editou o IOC {ioc.value}", ioc=ioc.id)
     return jsonify(ioc.to_dict())
 
 
@@ -154,6 +171,7 @@ def delete_ioc(ioc_id):
     cache.invalidate_related(ioc.value)
     db.session.delete(ioc)
     db.session.commit()
+    activity.action("minha base", f"Excluiu o IOC {ioc.value}")
     return jsonify(message="Indicador removido")
 
 
@@ -164,6 +182,7 @@ def purge_expired_iocs():
         cache.invalidate_related(ioc.value)
         db.session.delete(ioc)
     db.session.commit()
+    activity.action("minha base", f"Removeu {len(expired)} IOC(s) expirado(s)")
     return jsonify(removed=len(expired), message=f"{len(expired)} IOC(s) expirado(s) removido(s)")
 
 
@@ -173,6 +192,7 @@ def clear_iocs():
     removed = Ioc.query.delete(synchronize_session=False)
     invalidated = cache.invalidate_local_matches()
     db.session.commit()
+    activity.action("minha base", f"Limpou a base ({removed} IOC(s) apagados)", level="aviso")
     return jsonify(
         removed=removed,
         cache_invalidated=invalidated,

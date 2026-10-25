@@ -59,6 +59,20 @@ def create_app(config_class=Config):
             return jsonify(error="Requisição recusada: origem não autorizada"), 403
         return None
 
+    @app.after_request
+    def save_activity(response):
+        # Grava o registro de atividades da requisição numa transação própria. Se a rota
+        # terminou com erro, descarta antes o que ela deixou pela metade.
+        from .services import activity
+
+        try:
+            if response.status_code >= 400:
+                db.session.rollback()
+            activity.flush()
+        except Exception:
+            db.session.rollback()
+        return response
+
     @app.errorhandler(404)
     def not_found(error):
         if request.path.startswith("/api/"):

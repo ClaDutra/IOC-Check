@@ -11,6 +11,8 @@
       var theme = null;
       try { theme = localStorage.getItem("ioc-theme"); } catch (e) {}
       document.documentElement.dataset.theme = theme === "light" ? "light" : "dark";
+      // Barra lateral recolhida (lembrada entre as páginas)
+      try { if (localStorage.getItem("ioc-sidebar") === "collapsed") document.documentElement.dataset.sidebar = "collapsed"; } catch (e) {}
     })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -37,27 +39,34 @@
         </span>
       </a>
 
+      <button type="button" class="collapse-btn" id="collapse-btn" aria-label="Recolher o menu" title="Recolher o menu">
+        <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
+
       <p class="nav-label">Menu</p>
       <nav class="nav">
-        <a href="{{ url_for('pages.dashboard') }}" class="{{ 'active' if active == 'dashboard' }}">
+        <a href="{{ url_for('pages.dashboard') }}" class="{{ 'active' if active == 'dashboard' }}" title="Painel">
           <svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.8"/></svg>
-          Painel</a>
-        <a href="{{ url_for('pages.check_page') }}" class="{{ 'active' if active == 'check' }}">
+          <span>Painel</span></a>
+        <a href="{{ url_for('pages.check_page') }}" class="{{ 'active' if active == 'check' }}" title="Verificar">
           <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
-          Verificar</a>
-        <a href="{{ url_for('pages.iocs_page') }}" class="{{ 'active' if active == 'iocs' }}">
+          <span>Verificar</span></a>
+        <a href="{{ url_for('pages.iocs_page') }}" class="{{ 'active' if active == 'iocs' }}" title="Minha base">
           <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6M5 12v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6v-6"/></svg>
-          Minha base</a>
-        <a href="{{ url_for('pages.history_page') }}" class="{{ 'active' if active == 'history' }}">
+          <span>Minha base</span></a>
+        <a href="{{ url_for('pages.history_page') }}" class="{{ 'active' if active == 'history' }}" title="Histórico">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
-          Histórico</a>
-        <a href="{{ url_for('pages.settings_page') }}" class="{{ 'active' if active == 'settings' }}">
+          <span>Histórico</span></a>
+        <a href="{{ url_for('pages.settings_page') }}" class="{{ 'active' if active == 'settings' }}" title="Configurações">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></svg>
-          Configurações</a>
+          <span>Configurações</span></a>
+        <a href="{{ url_for('pages.logs_page') }}" class="{{ 'active' if active == 'logs' }}" title="Logs">
+          <svg viewBox="0 0 24 24"><path d="M7 4h8l4 4v12H7z"/><path d="M15 4v4h4M10 12h6M10 15.5h6M10 19h3"/></svg>
+          <span>Logs</span></a>
       </nav>
 
       <div class="sidebar-foot">
-        <a class="sidebar-cta" href="{{ url_for('pages.check_page') }}">
+        <a class="sidebar-cta" href="{{ url_for('pages.check_page') }}" title="Nova verificação">
           <span>Nova verificação</span>
           <svg viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></svg>
         </a>
@@ -73,6 +82,12 @@
       {% block content %}{% endblock %}
     </main>
   </div>
+
+  <a class="watermark" href="https://github.com/ClaDutra/IOC-Check" target="_blank" rel="noopener"
+     title="Repositório do projeto no GitHub">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5a9.5 9.5 0 00-3 18.5c.5.1.7-.2.7-.5v-1.7c-2.7.6-3.3-1.2-3.3-1.2-.4-1.1-1.1-1.4-1.1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.6.3-1.1.6-1.3-2.1-.2-4.4-1.1-4.4-4.7 0-1 .4-1.9 1-2.6-.1-.2-.4-1.2.1-2.5 0 0 .8-.3 2.6 1a9 9 0 014.8 0c1.8-1.3 2.6-1 2.6-1 .5 1.3.2 2.3.1 2.5.6.7 1 1.6 1 2.6 0 3.7-2.3 4.5-4.4 4.7.3.3.6.9.6 1.8v2.7c0 .3.2.6.7.5A9.5 9.5 0 0012 2.5z"/></svg>
+    <span>github.com/ClaDutra/IOC-Check</span>
+  </a>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 

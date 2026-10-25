@@ -86,5 +86,12 @@
   </div>
   <div id="pagination" class="pagination"></div>
 </section>
+<dialog id="detail-dialog" class="dialog">
+  <div class="card-head">
+    <h2 id="detail-title" class="indicator">Detalhes do IOC</h2>
+    <button class="btn btn-ghost btn-sm" id="detail-close">Fechar</button>
+  </div>
+  <div id="detail-body"></div>
+</dialog>
 {% endblock %}
 {% block scripts %}<script src="{{ url_for('static', filename='js/iocs.js') }}"></script>{% endblock %}

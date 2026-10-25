@@ -85,6 +85,11 @@ def files(log_id, provider):
     return base.with_suffix(".png"), base.with_suffix(".json")
 
 
+def text_file(log_id, provider):
+    """Texto visível da página, guardado junto com o print (evidência em texto)."""
+    return files(log_id, provider)[0].with_suffix(".txt")
+
+
 def legacy_files(indicator, provider):
     """Formato antigo (por indicador), usado só para migrar prints já existentes."""
     key = hashlib.sha1(indicator.encode("utf-8")).hexdigest()[:16]
@@ -111,6 +116,8 @@ def info(log_id, provider):
         return None
     data = json.loads(meta.read_text("utf-8"))
     data["image"] = f"/api/capture/{log_id}.png?provider={provider}"
+    if text_file(log_id, provider).exists():
+        data["text"] = f"/api/capture/{log_id}.txt?provider={provider}"
     captured = _parse(data.get("captured_at"))
     if captured:
         expires = captured + _ttl()
@@ -143,6 +150,8 @@ def reuse_recent(log_id, indicator, providers):
                 src_png, src_meta = files(old.id, provider)
                 dst_png, dst_meta = files(log_id, provider)
                 shutil.copyfile(src_png, dst_png)
+                if text_file(old.id, provider).exists():
+                    shutil.copyfile(text_file(old.id, provider), text_file(log_id, provider))
                 meta = json.loads(src_meta.read_text("utf-8"))
                 meta["reused_from"] = meta.get("reused_from") or old.id
                 dst_meta.write_text(json.dumps(meta, ensure_ascii=False), "utf-8")
@@ -236,14 +245,18 @@ def capture(log_id, provider, url):
                     needed_human = True
                     page.bring_to_front()
                     if time.time() > deadline:
-                        raise CaptureError("A verificação do site não foi concluída a tempo. "
-                                           "Tente de novo e clique em \"Confirme que é humano\" na janela que abrir.")
+                        raise CaptureError("A verificação do site não foi concluída a tempo. Se ela ficar em "
+                                           "loop, use \"Abrir no meu navegador\" e depois \"Colar print\".")
                     time.sleep(2)
                 time.sleep(2)  # tempo para gráficos e fontes terminarem de desenhar
                 page.evaluate(HIDE_COOKIE_BANNERS)
                 png = _crop(page.screenshot(full_page=True))
                 title = page.title()
                 final_url = page.url
+                try:
+                    page_text = page.inner_text("body")
+                except Exception:
+                    page_text = ""
             finally:
                 context.close()
     finally:
@@ -254,4 +267,78 @@ def capture(log_id, provider, url):
     meta = {"provider": provider, "url": final_url, "title": title, "captured_at": iso(utcnow()),
             "needed_human": needed_human}
     meta_path.write_text(json.dumps(meta, ensure_ascii=False), "utf-8")
+    text_file(log_id, provider).write_text(page_text_document(meta, page_text), "utf-8")
+    return info(log_id, provider)
+
+
+def page_text_document(meta, page_text, limit=60000):
+    """Cabeçalho da evidência + texto visível da página (linhas vazias repetidas removidas)."""
+    lines, blank = [], False
+    for line in str(page_text).splitlines():
+        line = line.rstrip()
+        if not line:
+            if not blank:
+                lines.append("")
+            blank = True
+            continue
+        blank = False
+        lines.append(line)
+    body = "\n".join(lines).strip()[:limit]
+    return "\n".join([
+        f"IOC Check · Texto da página de {meta.get('provider')}",
+        "=" * 60,
+        f"Endereço: {meta.get('url')}",
+        f"Título: {meta.get('title')}",
+        f"Capturado em (UTC): {meta.get('captured_at')}",
+        "-" * 60,
+        body,
+        "-" * 60,
+        "Projeto: https://github.com/ClaDutra/IOC-Check",
+    ])
+
+
+
+MAX_UPLOAD = 15 * 1024 * 1024
+MAX_UPLOAD_PIXELS = 40_000_000  # evita imagens gigantes (ou maliciosas) que travariam o servidor
+
+
+def save_manual(log_id, provider, url, data, page_text=""):
+    """Print tirado pelo próprio usuário no navegador dele (Win+Shift+S) e colado no app.
+
+    Serve para sites que recusam navegadores automatizados: o usuário visita a página
+    normalmente e o IOC Check só guarda a imagem. Ela é validada e regravada em PNG
+    (o que também descarta metadados do arquivo original).
+    """
+    from PIL import Image
+
+    if not data:
+        raise CaptureError("Nenhuma imagem recebida")
+    if len(data) > MAX_UPLOAD:
+        raise CaptureError("Imagem muito grande (máximo de 15 MB)")
+    Image.MAX_IMAGE_PIXELS = MAX_UPLOAD_PIXELS
+    try:
+        image = Image.open(io.BytesIO(data))
+        if image.format not in ("PNG", "JPEG", "WEBP", "BMP", "GIF"):
+            raise CaptureError("Formato não aceito: envie PNG, JPG, WebP, BMP ou GIF")
+        image.load()
+    except CaptureError:
+        raise
+    except Exception:
+        raise CaptureError("O arquivo enviado não é uma imagem válida") from None
+    image = image.convert("RGB")
+    if image.height > MAX_HEIGHT * 2:
+        image = image.crop((0, 0, image.width, MAX_HEIGHT * 2))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG", optimize=True)
+
+    image_path, meta_path = files(log_id, provider)
+    image_path.write_bytes(buffer.getvalue())
+    meta = {"provider": provider, "url": url, "title": "Print enviado pelo usuário",
+            "captured_at": iso(utcnow()), "needed_human": False, "manual": True}
+    meta_path.write_text(json.dumps(meta, ensure_ascii=False), "utf-8")
+    text = text_file(log_id, provider)
+    if page_text.strip():
+        text.write_text(page_text_document(meta, page_text), "utf-8")
+    elif text.exists():
+        text.unlink()  # o texto de um print anterior não corresponde a esta imagem
     return info(log_id, provider)

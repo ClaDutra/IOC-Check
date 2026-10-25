@@ -5,7 +5,7 @@ rem  1. confere o Python e o ambiente virtual (.venv)
 rem  2. instala ou repara as dependencias (so quando preciso)
 rem  3. inicia o servidor EM SEGUNDO PLANO (sem janela do CMD) e abre o
 rem     navegador em http://localhost:5000. Esta janela fecha sozinha.
-rem  Para encerrar: botao "Encerrar IOC Check" no app ou o arquivo parar.bat
+rem  Para encerrar: botao "Encerrar" (barra lateral) no app ou o arquivo parar.bat
 rem ============================================================
 chcp 65001 >nul
 setlocal
@@ -99,7 +99,7 @@ goto erro_servidor
 echo.
 echo   IOC Check rodando em %ENDERECO%
 echo   Esta janela vai fechar; o app continua funcionando em segundo plano.
-echo   Para encerrar, use o botao "Encerrar IOC Check" no app ou o parar.bat.
+echo   Para encerrar, use o botao "Encerrar" (barra lateral) no app ou o parar.bat.
 if not defined IOC_SEM_NAVEGADOR start "" "%ENDERECO%"
 ping -n 4 127.0.0.1 >nul
 exit /b 0

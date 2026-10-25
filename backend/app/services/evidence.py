@@ -20,6 +20,9 @@ from ..ioc_utils import TYPE_LABELS
 from . import media as media_store
 from .providers import VERDICT_ORDER
 
+# Marca d'água com o endereço do projeto no GitHub, em todos os prints e textos de evidência
+WATERMARK = "github.com/ClaDutra/IOC-Check"
+
 # A base local é do próprio analista: os prints de evidência mostram só as ferramentas externas
 LOCAL_SOURCE = "Base local"
 
@@ -214,7 +217,31 @@ class Card:
 
     def finish(self):
         self.y += PAD // 2
-        return self.image.crop((0, 0, WIDTH, self.y))
+        return watermark(self.image.crop((0, 0, WIDTH, self.y)))
+
+
+def watermark(image, opacity=22):
+    """Marca d'água discreta: o endereço do projeto repetido na diagonal + selo no canto."""
+    base = image.convert("RGBA")
+    fnt = font(26, "bold")
+    probe = ImageDraw.Draw(base)
+    tw = int(probe.textlength(WATERMARK, font=fnt)) + 140
+    tile = Image.new("RGBA", (tw, 170), (0, 0, 0, 0))
+    ImageDraw.Draw(tile).text((20, 60), WATERMARK, font=fnt, fill=(96, 81, 155, opacity))
+    tile = tile.rotate(24, expand=True)
+    layer = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    for y in range(-tile.height, base.height + tile.height, tile.height - 40):
+        offset = (y // max(tile.height - 40, 1)) % 2 * (tile.width // 2)
+        for x in range(-tile.width + offset, base.width + tile.width, tile.width):
+            layer.paste(tile, (x, y), tile)
+    # selo legível no canto inferior direito
+    seal_font = font(15, "bold")
+    sw = int(probe.textlength(WATERMARK, font=seal_font))
+    seal = ImageDraw.Draw(layer)
+    x0, y0 = base.width - sw - 30, base.height - 34
+    seal.rounded_rectangle((x0 - 10, y0 - 6, x0 + sw + 10, y0 + 22), radius=8, fill=(30, 32, 44, 170))
+    seal.text((x0, y0), WATERMARK, font=seal_font, fill=(255, 255, 255, 235))
+    return Image.alpha_composite(base, layer).convert("RGB")
 
 
 def _header(card, entry, title):
@@ -266,6 +293,7 @@ def _footer(card):
     card.gap(10).rule().gap(10)
     card.text("Imagem gerada pelo IOC Check a partir das respostas das APIs públicas das fontes "
               "(planos gratuitos). Os dados refletem o momento da consulta indicado acima.", size=14, color=MUTED)
+    card.gap(30)  # espaço para o selo da marca d'água
 
 
 def render_source(entry, result):
@@ -304,3 +332,71 @@ def to_png(image):
     buffer = io.BytesIO()
     image.save(buffer, format="PNG", optimize=True)
     return buffer.getvalue()
+
+
+# --- Evidência em texto -------------------------------------------------------
+# Mesmo conteúdo dos prints, em texto simples, para colar em tickets, e-mails e relatórios.
+
+STATUS_TEXT = {"ok": "Analisado", "not_found": "Sem registro", "skipped": "Não consultado", "error": "Erro"}
+FLAG_TEXT = {"bad": "[!]", "warn": "[atenção]", "info": "[i]"}
+
+
+def _text_header(entry, title):
+    return [
+        f"IOC Check · Evidência · {title}",
+        "=" * 60,
+        f"Indicador: {entry.indicator}",
+        f"Tipo: {TYPE_LABELS.get(entry.ioc_type, entry.ioc_type)}",
+        f"Consultado em: {_local(entry.stored_at)}",
+    ]
+
+
+def _text_source(result):
+    label = VERDICT_STYLE.get(result.get("verdict"), VERDICT_STYLE["unknown"])[0]
+    lines = ["", f"## {result.get('provider', '')}",
+             f"Status: {STATUS_TEXT.get(result.get('status'), result.get('status'))}"]
+    if result.get("status") == "ok":
+        lines.append(f"Veredito: {label} · score {int(result.get('score') or 0)}/100")
+    if result.get("summary"):
+        lines.append(f"Resumo: {result['summary']}")
+    if result.get("flags"):
+        lines.append("Alertas:")
+        lines += [f"  {FLAG_TEXT.get(f.get('level'), '-')} {f.get('text', '')}" for f in result["flags"]]
+    if result.get("facts"):
+        lines.append("Informações:")
+        lines += [f"  {f.get('label')}: {f.get('value')}" for f in result["facts"]]
+    for section in result.get("sections") or []:
+        lines.append(f"{section.get('title')}:")
+        lines += [f"  - {row.get('text', '')}" for row in section.get("rows") or []]
+    for item in result.get("media") or []:
+        if item.get("type") == "image":
+            lines.append(f"Captura de tela: {item.get('url')}")
+    if result.get("link"):
+        lines.append(f"Fonte: {result['link']}")
+    return lines
+
+
+def _text_footer():
+    return ["", "-" * 60,
+            "Gerado pelo IOC Check a partir das respostas das APIs públicas das fontes (planos gratuitos).",
+            f"Projeto: https://{WATERMARK}"]
+
+
+def text_source(entry, result):
+    return "\n".join(_text_header(entry, result.get("provider", "Fonte")) + _text_source(result) + _text_footer())
+
+
+def text_all(entry):
+    results = tool_results(entry)
+    verdict, score = tool_verdict(results)
+    label = VERDICT_STYLE.get(verdict, VERDICT_STYLE["unknown"])[0]
+    lines = _text_header(entry, "Todas as fontes") + [f"Veredito das ferramentas: {label} · score {score}/100"]
+    shown = [r for r in results if r.get("status") in ("ok", "not_found")]
+    for result in shown:
+        lines += _text_source(result)
+    skipped = [r for r in results if r not in shown]
+    if skipped:
+        lines += ["", "Não consultadas:"] + [
+            f"  - {r['provider']}: {r.get('summary', '')}" + (f" ({r['link']})" if r.get("link") else "")
+            for r in skipped]
+    return "\n".join(lines + _text_footer())

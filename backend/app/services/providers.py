@@ -10,6 +10,7 @@ que registra o consumo em services/quota.py e respeita os limites de cada fonte.
 """
 
 import base64
+import time
 from dataclasses import dataclass
 from typing import Callable
 from urllib.parse import quote, urlsplit
@@ -17,7 +18,7 @@ from urllib.parse import quote, urlsplit
 import requests
 
 from ..ioc_utils import HASH_TYPES, IP_TYPES, detect_type, is_private_ip, related_host
-from . import quota, settings
+from . import activity, quota, settings
 from .report_parsers import (
     analyze_abuseipdb,
     analyze_hybrid_overview,
@@ -60,9 +61,16 @@ def provider_result(provider, status, verdict="unknown", score=0, summary="", de
 
 
 def _http(provider_id, method, url, **kwargs):
-    """Faz a chamada HTTP e registra o consumo da cota gratuita da fonte."""
-    response = getattr(requests, method)(url, **kwargs)
+    """Faz a chamada HTTP, registra o consumo da cota gratuita e grava a chamada nos Logs
+    (endereço, parâmetros, código e começo da resposta; nunca os cabeçalhos com a chave)."""
+    started = time.perf_counter()
+    try:
+        response = getattr(requests, method)(url, **kwargs)
+    except requests.RequestException as exc:
+        activity.api_call(provider_id, method, url, kwargs, started, error=exc)
+        raise
     quota.record(provider_id, response)
+    activity.api_call(provider_id, method, url, kwargs, started, response=response)
     return response
 
 
@@ -597,15 +605,31 @@ def provider_state(provider):
             "usage": quota.usage(provider.id), "terms": provider.terms}
 
 
-def run_provider(provider, value, ioc_type, ignore_disabled=False):
+def source_link(provider_id, value, ioc_type):
+    """Página pública da fonte já com o indicador, para abrir mesmo quando a API falha."""
+    q = quote(value, safe="")
+    if provider_id == "virustotal":
+        return f"https://www.virustotal.com/gui/search/{q}"
+    if provider_id == "abuseipdb":
+        return f"https://www.abuseipdb.com/check/{q}"
+    if provider_id == "threatfox":
+        return f"https://threatfox.abuse.ch/browse.php?search=ioc%3A{q}"
+    if provider_id == "hybrid_analysis":
+        return f"https://www.hybrid-analysis.com/search?query={q}"
+    if provider_id == "urlscan":
+        return f"https://urlscan.io/search/#{quote(_urlscan_query(value, ioc_type), safe='')}"
+    if provider_id == "mxtoolbox":
+        target, commands = _mxtoolbox_target(value, ioc_type)
+        return f"https://mxtoolbox.com/SuperTool.aspx?action={commands[0]}%3a{quote(target, safe='')}&run=toolpage"
+    if provider_id == "ipinfo":
+        return f"https://ipinfo.io/{q}"
+    return None
+
+
+def _query_provider(provider, value, ioc_type, state, ignore_disabled):
     name = provider.name
-    state = provider_state(provider)
     if not state["enabled"] and not ignore_disabled:
         return provider_result(name, "skipped", summary="Fonte desativada nas configurações")
-    if ioc_type not in provider.types:
-        return provider_result(name, "skipped", summary="Tipo de indicador não suportado por esta fonte")
-    if is_private_ip(value, ioc_type):
-        return provider_result(name, "skipped", summary="IP privado/reservado não é consultado")
     if provider.key_required and not state["has_key"]:
         return provider_result(name, "skipped", summary="Chave de API não configurada")
     paused = quota.check(provider.id)
@@ -622,6 +646,20 @@ def run_provider(provider, value, ioc_type, ignore_disabled=False):
         return provider_result(name, "error", summary=f"Falha de conexão: {exc.__class__.__name__}")
     except (KeyError, TypeError, ValueError, AttributeError):
         return provider_result(name, "error", summary="Resposta da API em formato inesperado")
+
+
+def run_provider(provider, value, ioc_type, ignore_disabled=False):
+    name = provider.name
+    if ioc_type not in provider.types:
+        return provider_result(name, "skipped", summary="Tipo de indicador não suportado por esta fonte")
+    if is_private_ip(value, ioc_type):
+        return provider_result(name, "skipped", summary="IP privado/reservado não é consultado")
+
+    result = _query_provider(provider, value, ioc_type, provider_state(provider), ignore_disabled)
+    # Sem resposta útil (falha, sem chave, pausa...), o link leva direto à página da fonte
+    if not result.get("link"):
+        result["link"] = source_link(provider.id, value, ioc_type)
+    return result
 
 
 def run_all(value, ioc_type):

@@ -173,3 +173,34 @@ class QueryLog(db.Model):
         if include_results:
             data["results"] = self.results
         return data
+
+
+class AppLog(db.Model):
+    """Registro de atividades: ações feitas na aplicação e chamadas às APIs das fontes."""
+
+    __tablename__ = "app_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow, index=True)
+    category = db.Column(db.String(16), nullable=False, index=True)  # acao | api | sistema
+    level = db.Column(db.String(8), nullable=False, default="info", index=True)  # info | aviso | erro
+    source = db.Column(db.String(40), nullable=False, default="", index=True)
+    action = db.Column(db.String(60), nullable=False, default="")
+    message = db.Column(db.Text, nullable=False, default="")
+    status_code = db.Column(db.Integer)
+    duration_ms = db.Column(db.Integer)
+    details_json = db.Column(db.Text)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "created_at": iso(self.created_at),
+            "category": self.category,
+            "level": self.level,
+            "source": self.source,
+            "action": self.action,
+            "message": self.message,
+            "status_code": self.status_code,
+            "duration_ms": self.duration_ms,
+            "details": json.loads(self.details_json) if self.details_json else None,
+        }

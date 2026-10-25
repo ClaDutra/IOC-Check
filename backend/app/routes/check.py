@@ -2,7 +2,8 @@ from flask import Blueprint, current_app, jsonify
 
 from ..extensions import db
 from ..ioc_utils import parse_input
-from ..services import page_capture
+from ..services import activity, page_capture
+from ..services.providers import VERDICT_LABEL
 from ..services.checker import check_many
 from .utils import json_body
 
@@ -32,6 +33,14 @@ def check():
         result["captures"] = {} if force_refresh else page_capture.reuse_recent(
             result["history_id"], result["indicator"], [r["provider"] for r in result["results"]])
     db.session.commit()
+    for result in results:
+        if result.get("valid"):
+            activity.action("verificar", f"Verificou {result['indicator']}: {VERDICT_LABEL[result['verdict']]} "
+                            f"(score {result['score']}) · {'do cache' if result['from_cache'] else 'consulta nova'}",
+                            indicador=result["indicator"], tipo=result["type"], veredito=result["verdict"],
+                            score=result["score"], historico=result["history_id"])
+        else:
+            activity.action("verificar", f"Entrada inválida: {result['input']}", level="aviso")
     return jsonify(
         results=results,
         summary={

@@ -18,6 +18,11 @@ from app import create_app  # noqa: E402
 app = create_app()
 
 if __name__ == "__main__":
+    from app.services import activity
+
+    with app.app_context():
+        activity.log("sistema", "iniciar", f"Servidor iniciado em http://localhost:{os.getenv('PORT', '5000')}",
+                     source="sistema")
     # Ferramenta pessoal sem login: escuta apenas no próprio computador (127.0.0.1),
     # então outras máquinas da rede não conseguem acessar sua base.
     app.run(

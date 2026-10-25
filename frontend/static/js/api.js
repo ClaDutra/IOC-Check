@@ -292,16 +292,45 @@ function evidenceButtons(historyId, r) {
   return evidenceActions(url, "resumo");
 }
 
-function evidenceActions(url, label, primary = false) {
+// Botões de uma evidência: copiar/baixar a imagem e, quando houver, a mesma evidência em texto.
+// Os prints de evidência (/api/evidence/<id>.png) têm sempre a versão .txt correspondente.
+function evidenceActions(url, label, primary = false, textUrl = undefined) {
   const sep = url.includes("?") ? "&" : "?";
+  if (textUrl === undefined && /^\/api\/evidence\/\d+\.png/.test(url)) textUrl = url.replace(".png", ".txt");
+  const tsep = textUrl && textUrl.includes("?") ? "&" : "?";
+  const text = textUrl ? `
+      <button type="button" class="btn btn-sm" data-copy-text="${escapeHtml(textUrl)}"
+              title="Copia a evidência em texto simples, para colar em tickets, e-mails e relatórios">📝 Copiar texto</button>
+      <a class="btn btn-sm btn-ghost" href="${escapeHtml(textUrl + tsep)}download=1" title="Baixar a evidência em texto (TXT)">⬇ TXT</a>` : "";
   return `
     <div class="evidence-actions${primary ? " primary" : ""}">
       <button type="button" class="btn btn-sm${primary ? " btn-primary" : ""}" data-copy-evidence="${escapeHtml(url)}"
               title="Copia a imagem para colar com Ctrl+V em documentos, e-mails ou chats">📋 Copiar ${escapeHtml(label)}</button>
-      <a class="btn btn-sm" href="${escapeHtml(url + sep)}download=1" title="Baixar a imagem (PNG)">⬇ Baixar</a>
+      <a class="btn btn-sm" href="${escapeHtml(url + sep)}download=1" title="Baixar a imagem (PNG)">⬇ PNG</a>${text}
       <a class="btn btn-sm btn-ghost" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="Abrir a imagem em nova aba">Ver</a>
     </div>`;
 }
+
+async function copyTextEvidence(url, button) {
+  const original = button.textContent;
+  button.disabled = true;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || `Erro ${response.status}`);
+    await navigator.clipboard.writeText(await response.text());
+    toast("Evidência em texto copiada! Cole com Ctrl+V.", "success");
+  } catch (err) {
+    toast(err.message || "Não deu para copiar o texto", "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
+}
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-copy-text]");
+  if (button) copyTextEvidence(button.dataset.copyText, button);
+});
 
 // Copia o PNG para a área de transferência. A promessa é passada direto ao
 // ClipboardItem para o navegador manter a permissão do clique durante o download.
@@ -362,22 +391,112 @@ function captureContent(capture, provider) {
       <a href="${escapeHtml(url)}" target="_blank" rel="noopener" title="Abrir o print em tamanho real">
         <img src="${escapeHtml(url + sep)}v=${encodeURIComponent(capture.captured_at)}" alt="Print da página de ${escapeHtml(provider)}" loading="lazy">
       </a>
-      <figcaption>Página de ${escapeHtml(provider)} capturada em ${escapeHtml(formatDate(capture.captured_at))}${captureValidity(capture)}</figcaption>
+      <figcaption>Página de ${escapeHtml(provider)} ${capture.manual ? "(print manual) " : ""}capturada em ${escapeHtml(formatDate(capture.captured_at))}${captureValidity(capture)}</figcaption>
     </figure>
-    ${evidenceActions(url, "print da página")}`;
+    ${evidenceActions(url, "print da página", false, capture.text || null)}`;
 }
 
+function hasPublicLink(r) {
+  try {
+    return r.provider !== "Base local" && new URL(r.link).protocol === "https:";
+  } catch (_) {
+    return false;
+  }
+}
+
+// Bloco de print da página: automático (quando o site permite) ou manual — o usuário abre a
+// página no próprio navegador, tira o print (Win+Shift+S) e cola ou envia aqui.
 function pageCaptureBlock(historyId, r, capture) {
-  if (!historyId || !canCapture(r)) return "";
+  if (!historyId || !hasPublicLink(r)) return "";
+  const auto = canCapture(r) ? `
+        <button type="button" class="btn btn-sm btn-primary" data-capture-page>
+          📸 ${capture ? "Novo print automático" : "Print da página"}
+        </button>` : "";
   return `
-    <div class="page-capture" data-entry="${historyId}" data-provider="${escapeHtml(r.provider)}">
-      <button type="button" class="btn btn-sm btn-primary" data-capture-page>
-        📸 ${capture ? "Novo print da página" : "Print da página"} de ${escapeHtml(r.provider)}
-      </button>
+    <div class="page-capture" data-entry="${historyId}" data-provider="${escapeHtml(r.provider)}"
+         title="Você também pode arrastar uma imagem para cá">
+      <div class="capture-buttons">${auto}
+        <a class="btn btn-sm" href="${escapeHtml(r.link)}" target="_blank" rel="noopener"
+           title="Abre a página no seu navegador normal; tire o print com Win+Shift+S">🌐 Abrir no meu navegador</a>
+        <button type="button" class="btn btn-sm" data-paste-capture
+                title="Cola o print que está na área de transferência (Win+Shift+S)">📋 Colar print</button>
+        <label class="btn btn-sm" title="Escolher um arquivo de imagem (PNG, JPG, WebP)">⬆ Enviar imagem
+          <input type="file" accept="image/png,image/jpeg,image/webp,image/bmp,image/gif" data-upload-capture hidden>
+        </label>
+      </div>
       <p class="capture-status small muted" hidden></p>
       <div class="capture-result">${captureContent(capture, r.provider)}</div>
     </div>`;
 }
+
+// Envia o print manual (Blob/File) para a consulta do histórico
+async function uploadManualCapture(block, blob) {
+  const status = block.querySelector(".capture-status");
+  const provider = block.dataset.provider;
+  status.hidden = false;
+  status.textContent = "Salvando o print…";
+  const form = new FormData();
+  form.append("image", blob, blob.name || "print.png");
+  try {
+    const response = await fetch(`/api/capture/${block.dataset.entry}/manual?provider=${encodeURIComponent(provider)}`, {
+      method: "POST",
+      headers: { "X-Requested-With": "IOCCheck", Accept: "application/json" },
+      body: form,
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `Erro ${response.status}`);
+    block.querySelector(".capture-result").innerHTML = captureContent(data, provider);
+    status.textContent = "Print salvo com a marca d'água; ele fica no histórico desta consulta.";
+    toast(`Print de ${provider} salvo.`, "success");
+  } catch (err) {
+    status.textContent = err.message;
+    toast(err.message, "error");
+  }
+}
+
+async function pasteCapture(block) {
+  try {
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      const type = item.types.find((t) => t.startsWith("image/"));
+      if (type) return uploadManualCapture(block, await item.getType(type));
+    }
+    toast("Nenhuma imagem na área de transferência. Tire o print com Win+Shift+S e tente de novo.", "error");
+  } catch (_) {
+    toast("O navegador não liberou a área de transferência: use \"Enviar imagem\" ou arraste o arquivo.", "error");
+  }
+}
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-paste-capture]");
+  if (button) pasteCapture(button.closest(".page-capture"));
+});
+document.addEventListener("change", (event) => {
+  const input = event.target.closest("[data-upload-capture]");
+  if (input && input.files[0]) {
+    uploadManualCapture(input.closest(".page-capture"), input.files[0]);
+    input.value = "";
+  }
+});
+document.addEventListener("dragover", (event) => {
+  const block = event.target.closest(".page-capture");
+  if (block) {
+    event.preventDefault();
+    block.classList.add("drop-over");
+  }
+});
+document.addEventListener("dragleave", (event) => {
+  event.target.closest?.(".page-capture")?.classList.remove("drop-over");
+});
+document.addEventListener("drop", (event) => {
+  const block = event.target.closest(".page-capture");
+  if (!block) return;
+  event.preventDefault();
+  block.classList.remove("drop-over");
+  const file = [...event.dataTransfer.files].find((f) => f.type.startsWith("image/"));
+  if (file) uploadManualCapture(block, file);
+  else toast("Solte um arquivo de imagem (PNG, JPG ou WebP).", "error");
+});
 
 async function capturePage(block) {
   const button = block.querySelector("[data-capture-page]");
@@ -393,10 +512,12 @@ async function capturePage(block) {
     status.textContent = capture.needed_human
       ? "Print feito depois da verificação do site."
       : "Print feito.";
-    button.textContent = `📸 Novo print da página de ${provider}`;
+    button.textContent = "📸 Novo print automático";
     toast(`Print da página de ${provider} pronto. Use "Copiar print da página".`, "success");
   } catch (err) {
-    status.textContent = err.message;
+    // Sites que recusam navegador automatizado (ex.: verificação em loop): print manual
+    status.textContent = `${err.message} Alternativa: clique em "🌐 Abrir no meu navegador", tire o print ` +
+      `com Win+Shift+S e depois em "📋 Colar print".`;
     toast(err.message, "error");
   } finally {
     button.disabled = false;
@@ -407,6 +528,32 @@ document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-capture-page]");
   if (button) capturePage(button.closest(".page-capture"));
 });
+
+// --- Barra lateral recolhível ----------------------------------------------
+
+function renderCollapseButton() {
+  const button = document.getElementById("collapse-btn");
+  if (!button) return;
+  const collapsed = document.documentElement.dataset.sidebar === "collapsed";
+  const label = collapsed ? "Expandir o menu" : "Recolher o menu";
+  button.setAttribute("aria-label", label);
+  button.title = label;
+}
+
+document.getElementById("collapse-btn")?.addEventListener("click", () => {
+  const root = document.documentElement;
+  const collapsed = root.dataset.sidebar !== "collapsed";
+  if (collapsed) root.dataset.sidebar = "collapsed";
+  else delete root.dataset.sidebar;
+  try {
+    localStorage.setItem("ioc-sidebar", collapsed ? "collapsed" : "expanded");
+  } catch (_) {
+    // navegação privada: vale só para esta página
+  }
+  renderCollapseButton();
+  window.dispatchEvent(new Event("resize")); // o hub do Painel redesenha as linhas
+});
+renderCollapseButton();
 
 // --- Tema claro / escuro ---------------------------------------------------
 

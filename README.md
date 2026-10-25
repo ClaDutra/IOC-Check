@@ -61,11 +61,12 @@ O **IOC Check** resolve isso em uma única aplicação web que roda no seu compu
 
 | Tela | O que faz |
 |---|---|
-| **Painel** | Estatísticas, gráfico de consultas dos últimos 14 dias, atividade recente agrupada por dia, distribuição por veredito e tipo, status das fontes e dicas contextuais |
+| **Painel** | Busca rápida e o **hub de fontes conectadas** (escudo do IOC Check ligado às 8 fontes, com o estado de cada uma: ativa, pausada pelo limite gratuito ou sem chave), números de consultas, cache e base, gráfico dos últimos 14 dias, atividade recente por dia, distribuição por veredito e tipo e dicas contextuais |
 | **Verificar** | Detecção automática do tipo, normalização, veredito consolidado com score de 0 a 100, detalhe fonte por fonte com link para o relatório original e atalho para adicionar o indicador à sua base |
-| **Minha base** | Cadastro, edição e exclusão de IOCs com severidade, tags, fonte e validade; filtros (ativos, expirados, vencendo em 7 dias, desativados); renovação; remoção dos expirados; botão **Limpar base** |
+| **Minha base** | Cadastro, edição e exclusão de IOCs com severidade, tags, fonte e validade; filtros (ativos, expirados, vencendo em 7 dias, desativados); renovação; remoção dos expirados; botão **Limpar base**; botão **Detalhes** com os dados do IOC, a última verificação completa (fontes, prints e evidências) e as consultas anteriores |
 | **Histórico** | Todas as consultas com os **dados completos e os prints** (mesmo depois que o cache expira); detalhes de cada consulta; filtros; seleção de consultas; exportação escolhendo o conteúdo (resumo CSV, fontes CSV, JSON, prints de evidência e das páginas); exclusão de selecionadas; limpeza |
 | **Configurações** | Chaves de API (mascaradas, com teste de conexão), ativar/desativar cada fonte, tempo que cada IOC pesquisado fica no **cache** (padrão 24h) com o resumo do cache, validade padrão dos IOCs, tempo limite e a seção **Meus dados** |
+| **Logs** | Registro de tudo o que a aplicação fez: suas ações (verificar, cadastrar, exportar, configurar) e cada chamada às APIs das fontes, com endereço, parâmetros, código HTTP, tempo e o começo da resposta; filtros, busca, exportação em JSON e limpeza. Os cabeçalhos com as chaves nunca são gravados e qualquer chave que apareça numa resposta é mascarada |
 
 ## Tecnologias
 
@@ -87,25 +88,30 @@ IOC Check/
 │   │   ├── check.html          #   Verificar
 │   │   ├── iocs.html           #   Minha base
 │   │   ├── history.html        #   Histórico
-│   │   └── settings.html       #   Configurações
+│   │   ├── settings.html       #   Configurações
+│   │   └── logs.html           #   Logs da aplicação
 │   └── static/
 │       ├── css/style.css       # Estilo e paleta de cores
 │       └── js/                 # Um script por página + api.js (funções compartilhadas)
+│                               #   e sources.js (ícones das fontes)
 │
 ├── backend/                    # Servidor, regras de negócio e banco
 │   ├── app/
 │   │   ├── __init__.py         # create_app(): configura Flask, banco, rotas e segurança
 │   │   ├── config.py           # Variáveis de ambiente (.env)
-│   │   ├── models.py           # Tabelas: iocs, cache_entries, query_logs, settings
+│   │   ├── models.py           # Tabelas: iocs, cache_entries, query_logs, settings, provider_quota, app_logs
 │   │   ├── ioc_utils.py        # Detecção de tipo, refang e normalização
 │   │   ├── routes/             # Endpoints da API REST e páginas
 │   │   └── services/
 │   │       ├── checker.py      #   fluxo de verificação e veredito
 │   │       ├── cache.py        #   leitura, gravação e expiração do cache
-│   │       ├── providers.py    #   integrações com as 5 fontes externas
+│   │       ├── providers.py    #   integrações com as 7 fontes externas
 │   │       ├── quota.py        #   respeito aos limites dos planos gratuitos
 │   │       ├── report_parsers.py #   leitura detalhada dos relatórios (downloads, redirecionamentos...)
-│   │       ├── evidence.py     #   resumos em imagem (PNG) para copiar e colar
+│   │       ├── evidence.py     #   evidências em imagem (PNG) e em texto, com marca d'água
+│   │       ├── history.py      #   histórico completo e exportação
+│   │       ├── media.py        #   cópia local das capturas de tela do URLScan.io
+│   │       ├── activity.py     #   registro de ações e chamadas às APIs (tela Logs)
 │   │       ├── page_capture.py #   print da página pública de cada fonte
 │   │       └── settings.py     #   configurações salvas no banco
 │   ├── tests/                  # Testes automatizados (pytest)
@@ -117,8 +123,9 @@ IOC Check/
 │   └── .env.example
 │
 ├── iniciar.bat                 # Inicia o app em segundo plano com dois cliques (Windows)
-├── parar.bat                   # Encerra o app (o mesmo que o botão "Encerrar IOC Check")
+├── parar.bat                   # Encerra o app (o mesmo que o botão "⏻ Encerrar")
 ├── iniciar.sh                  # Inicia o app com um comando (Linux/macOS)
+├── .gitattributes              # Fim de linha correto dos scripts (.bat em CRLF, .sh em LF)
 └── README.md
 ```
 
@@ -313,6 +320,19 @@ miniatura com os botões **📋 Copiar print da página** (cola com Ctrl+V), **�
   inclui a captura de tela do site analisado e a cadeia de redirecionamentos
   (campo `data.redirects` do relatório).
 
+### Evidência em texto, links diretos e marca d'água
+
+- Toda evidência pode ser coletada **em texto**: **📝 Copiar texto** / **⬇ TXT** ao lado de cada
+  print (resumo de uma fonte, evidência completa e print da página). No print da página, o
+  texto visível do site é salvo junto com a imagem.
+- Mesmo quando a consulta a uma fonte falha (erro, limite gratuito, sem chave ou desativada),
+  o resultado traz o **link direto para a página da fonte já com o IOC**, e o botão 📸 Print
+  da página continua disponível.
+- Os prints de evidência, os prints de página e os textos levam a marca d'água
+  **github.com/ClaDutra/IOC-Check**, que também aparece no canto da aplicação.
+- O menu lateral pode ser **recolhido** (botão ‹ no topo), ficando só com os ícones; a escolha
+  é lembrada entre as páginas.
+
 ### Modo escuro
 
 O botão **🌙 Modo escuro / ☀️ Modo claro**, na barra lateral, alterna o tema. Na primeira
@@ -409,6 +429,11 @@ ser considerado nas verificações, mas pode ser renovado com um clique.
 | `GET` | `/api/capture/<id>.png?provider=<fonte>` | Print da página da fonte (`&download=1` para baixar) |
 | `GET` | `/api/evidence/<id>.png` | Print de evidência de uma consulta do histórico (`?provider=<fonte>` para uma fonte só; `&download=1` para baixar) |
 | `GET` | `/api/evidence/screenshot?url=` | Captura de tela do URLScan.io pela cópia local |
+| `GET` | `/api/evidence/<id>.txt` | Evidência em texto (`?provider=<fonte>`; `&download=1`) |
+| `GET` | `/api/capture/<id>.txt?provider=<fonte>` | Texto da página da fonte salvo junto com o print |
+| `GET` | `/api/iocs/<id>/details` | IOC da base + última verificação completa e consultas anteriores |
+| `GET` `DELETE` | `/api/logs` | Logs da aplicação (filtros `category`, `level`, `source`, `q`) ou limpeza |
+| `GET` | `/api/logs/export` | Exporta os logs filtrados em JSON |
 | `POST` | `/api/system/shutdown` | Encerra o IOC Check (botão da barra lateral) |
 
 Requisições `POST`, `PUT` e `DELETE` exigem o cabeçalho `X-Requested-With: IOCCheck`

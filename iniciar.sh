@@ -3,7 +3,7 @@
 #   1. confere o Python
 #   2. cria o ambiente virtual e instala as dependências (só na 1ª vez)
 #   3. inicia o servidor em segundo plano e abre o navegador em http://localhost:5000
-#      (para encerrar: botão "Encerrar IOC Check" no app)
+#      (para encerrar: botão "Encerrar" (barra lateral) no app)
 set -e
 cd "$(dirname "$0")"
 
@@ -71,5 +71,5 @@ until "$PY_VENV" -c "import socket; socket.create_connection(('127.0.0.1', $PORT
 done
 
 echo "IOC Check rodando em $ENDERECO (em segundo plano)."
-echo "Para encerrar, use o botão \"Encerrar IOC Check\" no app."
+echo "Para encerrar, use o botão \"Encerrar\" (barra lateral) no app."
 abrir_navegador

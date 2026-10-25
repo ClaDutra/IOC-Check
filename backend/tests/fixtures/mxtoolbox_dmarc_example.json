@@ -1,0 +1,148 @@
+{
+  "UID": null,
+  "ArgumentType": "domain",
+  "Command": "dmarc",
+  "IsTransitioned": false,
+  "CommandArgument": "example.com",
+  "TimeRecorded": "2026-10-24T07:29:24.8207228-05:00",
+  "ReportingNameServer": "hera.ns.cloudflare.com",
+  "TimeToComplete": "12",
+  "RelatedIP": null,
+  "ResourceRecordType": 16,
+  "IsEmptySubDomain": false,
+  "SPF_Subaction_Detail": null,
+  "Records": [
+    "v=DMARC1;p=reject;sp=reject;adkim=s;aspf=s"
+  ],
+  "IsEndpoint": false,
+  "HasSubscriptions": false,
+  "AlertgroupSubscriptionId": null,
+  "Failed": [],
+  "Warnings": [],
+  "Passed": [
+    {
+      "ID": 441,
+      "Name": "DMARC Record Published",
+      "Info": "DMARC Record found",
+      "Url": "https://mxtoolbox.com/Problem/dmarc/DMARC-Record-Published?page=prob_dmarc&showlogin=1&hidetoc=1&action=dmarc:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    },
+    {
+      "ID": 463,
+      "Name": "DMARC Syntax Check",
+      "Info": "The record is valid",
+      "Url": "https://mxtoolbox.com/Problem/dmarc/DMARC-Syntax-Check?page=prob_dmarc&showlogin=1&hidetoc=1&action=dmarc:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    },
+    {
+      "ID": 505,
+      "Name": "DMARC Multiple Records",
+      "Info": "Multiple DMARC records corrected to a single record.",
+      "Url": "https://mxtoolbox.com/Problem/dmarc/DMARC-Multiple-Records?page=prob_dmarc&showlogin=1&hidetoc=1&action=dmarc:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    },
+    {
+      "ID": 197,
+      "Name": "DMARC Policy Not Enabled",
+      "Info": "DMARC Quarantine/Reject policy enabled",
+      "Url": "https://mxtoolbox.com/Problem/dmarc/DMARC-Policy-Not-Enabled?page=prob_dmarc&showlogin=1&hidetoc=1&action=dmarc:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    },
+    {
+      "ID": 504,
+      "Name": "DMARC External Validation",
+      "Info": "All external domains in your DMARC record are giving permission to send them DMARC reports.",
+      "Url": "https://mxtoolbox.com/Problem/dmarc/DMARC-External-Validation?page=prob_dmarc&showlogin=1&hidetoc=1&action=dmarc:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    }
+  ],
+  "Timeouts": [],
+  "Errors": [],
+  "IsError": false,
+  "Information": [
+    {
+      "Tag": "",
+      "TagValue": "",
+      "Name": "record",
+      "Description": "v=DMARC1;p=reject;sp=reject;adkim=s;aspf=s"
+    },
+    {
+      "Tag": "v",
+      "TagValue": "DMARC1",
+      "Name": "Version",
+      "Description": "Identifies the record retrieved as a DMARC record. It must be the first tag in the list."
+    },
+    {
+      "Tag": "p",
+      "TagValue": "reject",
+      "Name": "Policy",
+      "Description": "Policy to apply to email that fails the DMARC test. Valid values can be &#39;none&#39;, &#39;quarantine&#39;, or &#39;reject&#39;."
+    },
+    {
+      "Tag": "sp",
+      "TagValue": "reject",
+      "Name": "Sub-domain Policy",
+      "Description": "Requested Mail Receiver policy for all subdomains. Valid values can be &#39;none&#39;, &#39;quarantine&#39;, or &#39;reject&#39;."
+    },
+    {
+      "Tag": "adkim",
+      "TagValue": "s",
+      "Name": "Alignment Mode DKIM",
+      "Description": "Indicates whether strict or relaxed DKIM Identifier Alignment mode is required by the Domain Owner. Valid values can be &#39;r&#39; (relaxed) or &#39;s&#39; (strict mode)."
+    },
+    {
+      "Tag": "aspf",
+      "TagValue": "s",
+      "Name": "Alignment Mode SPF",
+      "Description": "Indicates whether strict or relaxed SPF Identifier Alignment mode is required by the Domain Owner. Valid values can be &#39;r&#39; (relaxed) or &#39;s&#39; (strict mode)."
+    }
+  ],
+  "MultiInformation": [],
+  "Transcript": [
+    {
+      "Transcript": "- - - dmarc:_dmarc.example.com\r\n\r\n&emsp; 1 l.gtld-servers.net 192.41.162.30 NON-AUTH 8 ms Received 2 Referrals , rcode=NO_ERROR &emsp; example.com.\t172800\tIN\tNS\thera.ns.cloudflare.com,example.com.\t172800\tIN\tNS\telliott.ns.cloudflare.com,\r\n&emsp; 2 hera.ns.cloudflare.com 108.162.192.162 AUTH 3 ms Received 1 Answers , rcode=NO_ERROR &emsp; _dmarc.example.com.\t300\tIN\tTXT\tv=DMARC1;p=reject;sp=reject;adkim=s;aspf=s,\r\nRecord returned is a RFC 7489 TXT record.\r\n\r\n- LookupServer [dmarc:example.com] 12ms \r\n"
+    }
+  ],
+  "MxRep": 0,
+  "EmailServiceProvider": null,
+  "DnsServiceProvider": "Cloudflare",
+  "DnsServiceProviderIdentifier": "cloudflare.com",
+  "CustomData": null,
+  "RelatedLookups": [
+    {
+      "Name": "dns lookup",
+      "URL": "https://mxtoolbox.com/api/v1/lookup/a/example.com",
+      "Command": "a",
+      "CommandArgument": "example.com"
+    },
+    {
+      "Name": "dns check",
+      "URL": "https://mxtoolbox.com/api/v1/lookup/dns/example.com",
+      "Command": "dns",
+      "CommandArgument": "example.com"
+    },
+    {
+      "Name": "mx lookup",
+      "URL": "https://mxtoolbox.com/api/v1/lookup/mx/example.com",
+      "Command": "mx",
+      "CommandArgument": "example.com"
+    },
+    {
+      "Name": "spf lookup",
+      "URL": "https://mxtoolbox.com/api/v1/lookup/spf/example.com",
+      "Command": "spf",
+      "CommandArgument": "example.com"
+    },
+    {
+      "Name": "dns propagation",
+      "URL": "https://mxtoolbox.com/api/v1/lookup/dmarc/example.com:all",
+      "Command": "dmarc",
+      "CommandArgument": "example.com:all"
+    }
+  ]
+}

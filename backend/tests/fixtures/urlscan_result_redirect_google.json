@@ -1,0 +1,120 @@
+{
+ "task": {
+  "method": "api",
+  "source": "cca92e9a",
+  "tags": [],
+  "time": "2026-10-11T18:00:24.587Z",
+  "url": "http://google.com/",
+  "uuid": "01a12c1f-6943-73d9-a39c-a32f3b1e39c4",
+  "visibility": "public",
+  "reportURL": "https://urlscan.io/result/01a12c1f-6943-73d9-a39c-a32f3b1e39c4/",
+  "screenshotURL": "https://urlscan.io/screenshots/01a12c1f-6943-73d9-a39c-a32f3b1e39c4.png",
+  "domURL": "https://urlscan.io/dom/01a12c1f-6943-73d9-a39c-a32f3b1e39c4/",
+  "domain": "google.com",
+  "apexDomain": "google.com"
+ },
+ "page": {
+  "asn": "AS15169",
+  "asnname": "GOOGLE - Google LLC, US",
+  "city": "",
+  "country": "US",
+  "domain": "www.google.com",
+  "ip": "142.251.154.119",
+  "server": "gws",
+  "url": "https://www.google.com/",
+  "redirected": "parent-domain",
+  "apexDomainAgeDays": 4947,
+  "mimeType": "text/html",
+  "title": "Google",
+  "tlsValidDays": 83,
+  "tlsAgeDays": 22,
+  "domainAgeDays": 4947,
+  "tlsValidFrom": "2026-09-18T20:00:11.000Z",
+  "umbrellaRank": 3,
+  "apexDomain": "google.com",
+  "tlsIssuer": "WR2",
+  "status": "200"
+ },
+ "data": {
+  "redirects": [
+   {
+    "from": "http://google.com/",
+    "to": "https://google.com/",
+    "status": 307
+   },
+   {
+    "from": "https://google.com/",
+    "to": "https://www.google.com/",
+    "status": 301
+   }
+  ],
+  "requests": []
+ },
+ "lists": {
+  "ips": [
+   "2a00:1450:4001:c1f::66",
+   "142.251.14.95",
+   "2a00:1450:4001:c1f::5f",
+   "192.178.183.94",
+   "142.251.154.119"
+  ],
+  "domains": [
+   "www.google.com",
+   "www.gstatic.com",
+   "play.google.com",
+   "ogads-pa.clients6.google.com",
+   "fonts.gstatic.com"
+  ]
+ },
+ "verdicts": {
+  "overall": {
+   "score": 0,
+   "categories": [],
+   "brands": [],
+   "tags": [],
+   "malicious": false,
+   "hasVerdicts": true
+  },
+  "urlscan": {
+   "score": 0,
+   "categories": [],
+   "brands": [],
+   "tags": [],
+   "malicious": false,
+   "hasVerdicts": false
+  },
+  "engines": {
+   "score": -92,
+   "malicious": false,
+   "categories": [],
+   "enginesTotal": 0,
+   "maliciousTotal": 0,
+   "benignTotal": 0,
+   "maliciousVerdicts": [],
+   "benignVerdicts": [],
+   "hasVerdicts": true,
+   "tags": [
+    "urlscan-ml",
+    "urlscan-ml-60c5e22"
+   ]
+  },
+  "community": {
+   "score": 0,
+   "categories": [],
+   "brands": [],
+   "votesTotal": 0,
+   "votesMalicious": 0,
+   "votesBenign": 0,
+   "malicious": false,
+   "hasVerdicts": false
+  }
+ },
+ "meta": {
+  "processors": {
+   "download": {
+    "data": []
+   }
+  }
+ },
+ "stats": {}
+}

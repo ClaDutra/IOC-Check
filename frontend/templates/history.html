@@ -5,12 +5,13 @@
   <div>
     <h1>Histórico de consultas</h1>
     <p class="muted">
-      Todas as suas consultas. A coluna "Resultado de" mostra quando o resultado usado foi armazenado no cache.
+      Todas as suas consultas com os dados completos de cada fonte e os prints, mesmo depois que o cache expira.
+      Clique em "Detalhes" para rever uma consulta.
     </p>
   </div>
   <div class="actions">
     <button class="btn btn-danger" id="clear-history-btn">Limpar histórico</button>
-    <a class="btn" id="export-btn" href="/api/history/export">Exportar CSV</a>
+    <button class="btn btn-primary" id="export-btn">Exportar…</button>
   </div>
 </div>
 
@@ -38,13 +39,61 @@
     </select>
     <button class="btn" type="submit">Filtrar</button>
   </form>
+
+  <div class="selection-bar" id="selection-bar" hidden>
+    <strong id="selection-count"></strong>
+    <button class="btn btn-sm" id="export-selected-btn">Exportar selecionadas</button>
+    <button class="btn btn-sm btn-danger" id="delete-selected-btn">Excluir selecionadas</button>
+    <button class="btn btn-sm btn-ghost" id="clear-selection-btn">Limpar seleção</button>
+  </div>
+
   <div class="table-wrap">
     <table class="table">
-      <thead><tr><th>Data da consulta</th><th>Indicador</th><th>Tipo</th><th>Veredito</th><th>Score</th><th>Origem</th><th>Resultado de</th></tr></thead>
+      <thead><tr>
+        <th class="check-col"><input type="checkbox" id="select-page" title="Selecionar todas desta página"></th>
+        <th>Data da consulta</th><th>Indicador</th><th>Tipo</th><th>Veredito</th><th>Score</th><th>Origem</th><th>Resultado de</th><th></th>
+      </tr></thead>
       <tbody id="history-body"></tbody>
     </table>
   </div>
   <div id="pagination" class="pagination"></div>
 </section>
+
+<dialog id="detail-dialog" class="dialog">
+  <div class="card-head">
+    <h2 id="detail-title" class="indicator">Detalhes</h2>
+    <button class="btn btn-ghost btn-sm" id="detail-close">Fechar</button>
+  </div>
+  <div id="detail-body"></div>
+</dialog>
+
+<dialog id="export-dialog" class="dialog dialog-sm">
+  <form id="export-form" method="dialog">
+    <div class="card-head">
+      <h2>Exportar histórico</h2>
+      <button class="btn btn-ghost btn-sm" type="button" id="export-close">Fechar</button>
+    </div>
+
+    <fieldset class="export-group">
+      <legend>Quais consultas</legend>
+      <label class="check-line"><input type="radio" name="scope" value="selected"> <span id="scope-selected-label">Somente as selecionadas</span></label>
+      <label class="check-line"><input type="radio" name="scope" value="filter" checked> Todas as consultas do filtro atual</label>
+    </fieldset>
+
+    <fieldset class="export-group">
+      <legend>O que exportar</legend>
+      <label class="check-line"><input type="checkbox" name="include" value="summary" checked> Resumo das consultas <span class="muted small">(CSV, abre no Excel)</span></label>
+      <label class="check-line"><input type="checkbox" name="include" value="sources"> Detalhes fonte por fonte <span class="muted small">(CSV)</span></label>
+      <label class="check-line"><input type="checkbox" name="include" value="json"> Dados completos <span class="muted small">(JSON)</span></label>
+      <label class="check-line"><input type="checkbox" name="include" value="evidence"> Prints de evidência <span class="muted small">(PNG, um por consulta)</span></label>
+      <label class="check-line"><input type="checkbox" name="include" value="pages"> Prints das páginas das fontes <span class="muted small">(PNG já capturados)</span></label>
+    </fieldset>
+    <p class="muted small">Um único CSV ou JSON é baixado direto; com mais itens ou imagens, tudo vem num arquivo .zip.</p>
+
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">Exportar</button>
+    </div>
+  </form>
+</dialog>
 {% endblock %}
 {% block scripts %}<script src="{{ url_for('static', filename='js/history.js') }}"></script>{% endblock %}

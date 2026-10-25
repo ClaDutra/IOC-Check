@@ -4,30 +4,44 @@ Cada fonte devolve um dicionário no mesmo formato (ver provider_result), com
 status: ok | not_found | skipped | error. Fontes sem chave, desativadas nas
 Configurações ou que não suportam o tipo do indicador ficam como "skipped",
 então a aplicação continua funcionando só com a base local.
+
+Todas as chaves são de planos gratuitos: cada chamada HTTP passa por _http(),
+que registra o consumo em services/quota.py e respeita os limites de cada fonte.
 """
 
 import base64
 from dataclasses import dataclass
 from typing import Callable
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import requests
 
-from ..ioc_utils import HASH_TYPES, IP_TYPES, is_private_ip
-from . import settings
-from .report_parsers import analyze_abuseipdb, analyze_urlscan_report
+from ..ioc_utils import HASH_TYPES, IP_TYPES, detect_type, is_private_ip, related_host
+from . import quota, settings
+from .report_parsers import (
+    analyze_abuseipdb,
+    analyze_hybrid_overview,
+    analyze_ipinfo,
+    analyze_mxtoolbox,
+    analyze_threatfox,
+    analyze_urlscan_report,
+    analyze_virustotal,
+)
 
 VERDICT_ORDER = {"unknown": 0, "clean": 1, "suspicious": 2, "malicious": 3}
 VERDICT_LABEL = {"malicious": "malicioso", "suspicious": "suspeito", "clean": "limpo", "unknown": "sem veredito"}
 
 
 def provider_result(provider, status, verdict="unknown", score=0, summary="", details=None, link=None,
-                    flags=None, facts=None, sections=None):
+                    flags=None, facts=None, sections=None, media=None, transient=False):
     """Formato comum a todas as fontes.
 
-    flags:    alertas de comportamento, ex. {"text": "Baixa arquivo executável", "level": "bad"}
-    facts:    pares rótulo/valor exibidos em "Mais detalhes", ex. {"label": "ASN", "value": "..."}
-    sections: listas com título, ex. {"title": "Downloads", "rows": [{"text": ..., "check": hash}]}
+    flags:     alertas de comportamento, ex. {"text": "Baixa arquivo executável", "level": "bad"}
+    facts:     pares rótulo/valor exibidos em "Mais detalhes", ex. {"label": "ASN", "value": "..."}
+    sections:  listas com título, ex. {"title": "Downloads", "rows": [{"text": ..., "check": hash}]}
+    media:     imagens, ex. a captura de tela do URLScan.io {"type": "image", "url": ..., "caption": ...}
+    transient: True quando a fonte não respondeu por um motivo passageiro (ex.: limite por minuto);
+               o cache então guarda o resultado por pouco tempo, para tentar de novo em breve.
     """
     return {
         "provider": provider,
@@ -40,18 +54,36 @@ def provider_result(provider, status, verdict="unknown", score=0, summary="", de
         "flags": flags or [],
         "facts": facts or [],
         "sections": sections or [],
+        "media": media or [],
+        "transient": transient,
     }
 
 
-def _http_problem(name, response):
+def _http(provider_id, method, url, **kwargs):
+    """Faz a chamada HTTP e registra o consumo da cota gratuita da fonte."""
+    response = getattr(requests, method)(url, **kwargs)
+    quota.record(provider_id, response)
+    return response
+
+
+def _http_problem(name, response, provider_id=None):
     if response.status_code in (401, 403):
         return provider_result(name, "error", summary="Chave de API inválida ou sem permissão")
     if response.status_code == 429:
-        return provider_result(name, "error", summary="Limite de requisições da API atingido")
+        reason = (quota.check(provider_id) if provider_id else None) or "Limite gratuito da API atingido"
+        return provider_result(name, "skipped", summary=reason, transient=True)
     return provider_result(name, "error", summary=f"Resposta inesperada (HTTP {response.status_code})")
 
 
+def _raise_verdict(verdict, score, analysis):
+    """Os sinais encontrados nos relatórios podem elevar o veredito, nunca rebaixar."""
+    if analysis.get("verdict") and VERDICT_ORDER[analysis["verdict"]] > VERDICT_ORDER[verdict]:
+        verdict = analysis["verdict"]
+    return verdict, max(score, analysis.get("score") or 0)
+
+
 # --- VirusTotal -------------------------------------------------------------
+# API pública: 4 consultas/min, 500/dia, uso não comercial. Uma chamada por indicador.
 
 def _virustotal_path(value, ioc_type):
     if ioc_type in IP_TYPES:
@@ -68,7 +100,8 @@ def _virustotal_path(value, ioc_type):
 def query_virustotal(value, ioc_type, key, timeout):
     name = "VirusTotal"
     link = f"https://www.virustotal.com/gui/search/{quote(value, safe='')}"
-    response = requests.get(
+    response = _http(
+        "virustotal", "get",
         f"https://www.virustotal.com/api/v3/{_virustotal_path(value, ioc_type)}",
         headers={"x-apikey": key},
         timeout=timeout,
@@ -76,13 +109,13 @@ def query_virustotal(value, ioc_type, key, timeout):
     if response.status_code == 404:
         return provider_result(name, "not_found", summary="Indicador não encontrado no VirusTotal", link=link)
     if response.status_code != 200:
-        return _http_problem(name, response)
+        return _http_problem(name, response, "virustotal")
 
     attributes = response.json().get("data", {}).get("attributes", {})
     stats = attributes.get("last_analysis_stats", {})
     malicious = stats.get("malicious", 0)
     suspicious = stats.get("suspicious", 0)
-    total = sum(stats.values())
+    total = sum(v for v in stats.values() if isinstance(v, int))
 
     if malicious >= 3:
         verdict = "malicious"
@@ -90,13 +123,18 @@ def query_virustotal(value, ioc_type, key, timeout):
         verdict = "suspicious"
     else:
         verdict = "clean"
+    score = min(100, malicious * 10 + suspicious * 5)
+
+    analysis = analyze_virustotal(attributes, ioc_type)
+    verdict, score = _raise_verdict(verdict, score, analysis)
 
     return provider_result(
         name,
         "ok",
         verdict=verdict,
-        score=min(100, malicious * 10 + suspicious * 5),
-        summary=f"{malicious} de {total} mecanismos classificaram como malicioso",
+        score=score,
+        summary=f"{malicious} de {total} mecanismos classificaram como malicioso"
+                + (f" e {suspicious} como suspeito" if suspicious else ""),
         details={
             "malicious": malicious,
             "suspicious": suspicious,
@@ -105,15 +143,20 @@ def query_virustotal(value, ioc_type, key, timeout):
             "reputation": attributes.get("reputation"),
         },
         link=link,
+        flags=analysis["flags"],
+        facts=analysis["facts"],
+        sections=analysis["sections"],
     )
 
 
 # --- AbuseIPDB --------------------------------------------------------------
+# Conta gratuita: 1.000 consultas/dia (informado nos cabeçalhos X-RateLimit-*).
 
 def query_abuseipdb(value, ioc_type, key, timeout):
     name = "AbuseIPDB"
     link = f"https://www.abuseipdb.com/check/{value}"
-    response = requests.get(
+    response = _http(
+        "abuseipdb", "get",
         "https://api.abuseipdb.com/api/v2/check",
         headers={"Key": key, "Accept": "application/json"},
         # "verbose" inclui o nome do país e a lista de denúncias com categorias e comentários
@@ -121,7 +164,7 @@ def query_abuseipdb(value, ioc_type, key, timeout):
         timeout=timeout,
     )
     if response.status_code != 200:
-        return _http_problem(name, response)
+        return _http_problem(name, response, "abuseipdb")
 
     data = response.json().get("data", {})
     score = int(data.get("abuseConfidenceScore", 0))
@@ -161,6 +204,15 @@ def query_abuseipdb(value, ioc_type, key, timeout):
 
 
 # --- ThreatFox (abuse.ch) ---------------------------------------------------
+# Gratuito sob "fair use"; a conta informa 100.000 consultas/dia nos cabeçalhos.
+
+def _ioc_host(ioc):
+    """Host de um IOC do ThreatFox, que pode ser URL, "ip:porta" ou domínio."""
+    ioc = str(ioc or "").lower()
+    if "://" in ioc:
+        return urlsplit(ioc).hostname or ""
+    return ioc.rsplit(":", 1)[0] if ioc.count(":") == 1 else ioc
+
 
 def _threatfox_matches(ioc, value):
     # O ThreatFox guarda IPs como "ip:porta"; a busca é por trecho, então
@@ -177,14 +229,10 @@ def query_threatfox(value, ioc_type, key, timeout):
     else:
         body = {"query": "search_ioc", "search_term": value}
 
-    response = requests.post(
-        "https://threatfox-api.abuse.ch/api/v1/",
-        json=body,
-        headers={"Auth-Key": key},
-        timeout=timeout,
-    )
+    response = _http("threatfox", "post", "https://threatfox-api.abuse.ch/api/v1/",
+                     json=body, headers={"Auth-Key": key}, timeout=timeout)
     if response.status_code != 200:
-        return _http_problem(name, response)
+        return _http_problem(name, response, "threatfox")
 
     data = response.json()
     status = data.get("query_status")
@@ -193,87 +241,89 @@ def query_threatfox(value, ioc_type, key, timeout):
     if status != "ok":
         return provider_result(name, "error", summary=f"Consulta recusada pela API ({status})")
 
-    entries = [e for e in data.get("data") or [] if isinstance(e, dict)]
+    found = [e for e in data.get("data") or [] if isinstance(e, dict)]
+    entries, related = found, []
     if ioc_type not in HASH_TYPES:
-        entries = [e for e in entries if _threatfox_matches(str(e.get("ioc", "")), value)]
-    if not entries:
+        entries = [e for e in found if _threatfox_matches(str(e.get("ioc", "")), value)]
+        # Para IPs e domínios, URLs de malware hospedadas no mesmo host também importam
+        if ioc_type in IP_TYPES or ioc_type == "domain":
+            related = [e for e in found if e not in entries and _ioc_host(e.get("ioc")) == value.lower()]
+    if not entries and not related:
         return provider_result(name, "not_found", summary="Indicador não encontrado no ThreatFox", link=link)
 
-    confidence = max(int(e.get("confidence_level") or 0) for e in entries)
-    malware = sorted({e["malware_printable"] for e in entries if e.get("malware_printable")})
-    threat_types = sorted({e.get("threat_type_desc") or e.get("threat_type") for e in entries} - {None})
-    tags = sorted({tag for e in entries for tag in (e.get("tags") or [])})
-    first_seen = min((e["first_seen"] for e in entries if e.get("first_seen")), default=None)
+    analysis = analyze_threatfox(entries, related)
+    if entries:
+        confidence = max(int(e.get("confidence_level") or 0) for e in entries)
+        malware = sorted({e["malware_printable"] for e in entries if e.get("malware_printable")})
+        verdict, score = ("malicious" if confidence >= 50 else "suspicious"), max(confidence, 50)
+        summary = f"{len(entries)} registro(s): {', '.join(malware[:3]) or 'malware não identificado'} (confiança {confidence}%)"
+    else:
+        malware = sorted({e["malware_printable"] for e in related if e.get("malware_printable")})
+        summary = f"Não listado diretamente, mas hospeda {len(related)} IOC(s) de malware ({', '.join(malware[:3]) or '?'})"
+        if ioc_type in IP_TYPES:
+            verdict, score = "suspicious", 60
+        else:
+            # Domínios populares (github.com, drive.google.com...) hospedam arquivos de terceiros:
+            # é um aviso, não prova de que o domínio em si seja malicioso
+            verdict, score = "unknown", 0
+            summary += "; domínios de hospedagem pública também aparecem aqui"
 
     return provider_result(
-        name,
-        "ok",
-        verdict="malicious" if confidence >= 50 else "suspicious",
-        score=max(confidence, 50),
-        summary=f"{len(entries)} registro(s): {', '.join(malware[:3]) or 'malware não identificado'} "
-                f"(confiança {confidence}%)",
-        details={"malware": malware, "threat_types": threat_types, "tags": tags, "first_seen": first_seen},
-        link=link,
+        name, "ok", verdict=verdict, score=score, summary=summary,
+        details={"malware": malware, "related": len(related)},
+        link=link, flags=analysis["flags"], facts=analysis["facts"], sections=analysis["sections"],
     )
 
 
 # --- Hybrid Analysis (sandbox) ----------------------------------------------
+# Chaves gratuitas ("restricted") só acessam buscas: /search/hash e /overview.
+# A antiga busca por termos (IP, domínio, URL) não está disponível para elas,
+# por isso a fonte consulta apenas hashes. Limite: 200/min e 2.000/hora.
 
 HYBRID_URL = "https://www.hybrid-analysis.com/api/v2"
-HYBRID_VERDICTS = {
-    "malicious": "malicious",
-    "suspicious": "suspicious",
-    "no specific threat": "clean",
-    "whitelisted": "clean",
-}
-HYBRID_TERM_FIELD = {"ipv4": "host", "ipv6": "host", "domain": "domain", "url": "url"}
 
 
 def query_hybrid_analysis(value, ioc_type, key, timeout):
     name = "Hybrid Analysis"
-    link = f"https://www.hybrid-analysis.com/search?query={quote(value, safe='')}"
     headers = {"api-key": key, "User-Agent": "Falcon Sandbox", "Accept": "application/json"}
 
-    if ioc_type in HASH_TYPES:
-        response = requests.get(f"{HYBRID_URL}/search/hash", headers=headers, params={"hash": value}, timeout=timeout)
-        if response.status_code == 405:  # versões antigas da API usam POST
-            response = requests.post(f"{HYBRID_URL}/search/hash", headers=headers, data={"hash": value}, timeout=timeout)
-    else:
-        response = requests.post(
-            f"{HYBRID_URL}/search/terms",
-            headers=headers,
-            data={HYBRID_TERM_FIELD[ioc_type]: value},
-            timeout=timeout,
-        )
-
+    # 1) Busca pelo hash: descobre o SHA256 e o estado das análises na sandbox
+    response = _http("hybrid_analysis", "get", f"{HYBRID_URL}/search/hash",
+                     headers=headers, params={"hash": value}, timeout=timeout)
     if response.status_code == 404:
-        return provider_result(name, "not_found", summary="Nenhuma análise encontrada na sandbox", link=link)
+        return provider_result(name, "not_found", summary="Arquivo nunca analisado pela sandbox")
     if response.status_code != 200:
-        return _http_problem(name, response)
-
+        return _http_problem(name, response, "hybrid_analysis")
     data = response.json()
-    reports = data if isinstance(data, list) else (data.get("reports") or data.get("result") or [])
-    reports = [r for r in reports if isinstance(r, dict)]
-    if not reports:
-        return provider_result(name, "not_found", summary="Nenhuma análise encontrada na sandbox", link=link)
+    sha256s = [s for s in data.get("sha256s") or [] if isinstance(s, str)]
+    reports = [r for r in data.get("reports") or [] if isinstance(r, dict)]
+    if not sha256s:
+        return provider_result(name, "not_found", summary="Arquivo nunca analisado pela sandbox")
+    sha256 = sha256s[0]
+    link = f"https://www.hybrid-analysis.com/sample/{sha256}"
 
-    verdicts = [HYBRID_VERDICTS.get(str(r.get("verdict") or "").lower(), "unknown") for r in reports]
-    verdict = max(verdicts, key=VERDICT_ORDER.get)
-    scores = [r["threat_score"] for r in reports if isinstance(r.get("threat_score"), (int, float))]
-    score = int(max(scores)) if scores else {"malicious": 80, "suspicious": 50}.get(verdict, 0)
-    families = sorted({r["vx_family"] for r in reports if r.get("vx_family")})
+    # 2) Visão geral do arquivo: veredito, família, detecção dos antivírus etc.
+    response = _http("hybrid_analysis", "get", f"{HYBRID_URL}/overview/{sha256}", headers=headers, timeout=timeout)
+    if response.status_code == 404:
+        return provider_result(name, "not_found", summary="Arquivo sem visão geral na sandbox", link=link)
+    if response.status_code != 200:
+        return _http_problem(name, response, "hybrid_analysis")
 
-    summary = f"{len(reports)} análise(s) na sandbox; veredito mais grave: {VERDICT_LABEL[verdict]}"
-    if families:
-        summary += f"; família: {', '.join(families[:3])}"
-
+    analysis = analyze_hybrid_overview(response.json(), reports)
+    verdict = analysis["verdict"]
+    summary = f"Veredito da sandbox: {VERDICT_LABEL[verdict]}"
+    family = next((f["text"].split(": ", 1)[1] for f in analysis["flags"] if f["text"].startswith("Família:")), None)
+    if family:
+        summary += f"; família {family}"
     return provider_result(
-        name, "ok", verdict=verdict, score=score, summary=summary,
-        details={"reports": len(reports), "families": families}, link=link,
+        name, "ok", verdict=verdict, score=analysis["score"], summary=summary,
+        details={"sha256": sha256, "reports": len(reports)}, link=link,
+        flags=analysis["flags"], facts=analysis["facts"], sections=analysis["sections"],
     )
 
 
 # --- URLScan.io -------------------------------------------------------------
+# Com chave gratuita: 120 buscas/min (informado nos cabeçalhos X-Rate-Limit-*).
 
 def _urlscan_query(value, ioc_type):
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
@@ -292,18 +342,30 @@ def _urlscan_is_malicious(result):
     return bool(overall.get("malicious"))
 
 
+def _urlscan_screenshot(search_result, report):
+    """Captura de tela da página na varredura mais recente (imagem pública do URLScan.io)."""
+    task = (report or {}).get("task") or search_result.get("task") or {}
+    url = search_result.get("screenshot") or task.get("screenshotURL")
+    if not url or not str(url).startswith("https://urlscan.io/screenshots/"):
+        return []
+    when = str(task.get("time") or "")[:10]
+    return [{
+        "type": "image",
+        "url": url,
+        "caption": f"Captura de tela da página feita pelo URLScan.io" + (f" em {when}" if when else ""),
+        "link": task.get("reportURL") or _urlscan_report_page(search_result),
+    }]
+
+
 def query_urlscan(value, ioc_type, key, timeout):
     name = "URLScan.io"
     query = _urlscan_query(value, ioc_type)
     link = f"https://urlscan.io/search/#{quote(query, safe='')}"
-    response = requests.get(
-        "https://urlscan.io/api/v1/search/",
-        params={"q": query, "size": 100},
-        headers={"API-Key": key} if key else {},
-        timeout=timeout,
-    )
+    response = _http("urlscan", "get", "https://urlscan.io/api/v1/search/",
+                     params={"q": query, "size": 100},
+                     headers={"API-Key": key} if key else {}, timeout=timeout)
     if response.status_code != 200:
-        return _http_problem(name, response)
+        return _http_problem(name, response, "urlscan")
 
     data = response.json()
     results = [r for r in data.get("results") or [] if isinstance(r, dict)]
@@ -328,9 +390,7 @@ def query_urlscan(value, ioc_type, key, timeout):
     if report is not None:
         analysis = analyze_urlscan_report(report)
         flags, facts, sections = analysis["flags"], analysis["facts"], analysis["sections"]
-        if VERDICT_ORDER[analysis["verdict"]] > VERDICT_ORDER[verdict]:
-            verdict = analysis["verdict"]
-        score = max(score, analysis["score"])
+        verdict, score = _raise_verdict(verdict, score, analysis)
         behaviour = []
         if analysis["executables"]:
             behaviour.append(f"baixa {analysis['executables']} executável(is)")
@@ -354,30 +414,112 @@ def query_urlscan(value, ioc_type, key, timeout):
             "malicious": malicious,
             "last_scan": (latest.get("task") or {}).get("time"),
         },
-        link=latest.get("result") or link,
+        link=_urlscan_report_page(latest) or link,
         flags=flags,
         facts=facts,
         sections=sections,
+        media=_urlscan_screenshot(latest, report),
     )
+
+
+def _urlscan_report_page(search_result):
+    """Página do relatório para pessoas (o campo "result" da busca aponta para a API)."""
+    uuid = search_result.get("_id") or (search_result.get("task") or {}).get("uuid")
+    return f"https://urlscan.io/result/{quote(str(uuid), safe='')}/" if uuid else None
 
 
 def _urlscan_report(search_result, key, timeout):
     """Busca o relatório completo de uma varredura. Falhas aqui não invalidam a busca."""
     uuid = search_result.get("_id") or (search_result.get("task") or {}).get("uuid")
-    if not uuid:
+    if not uuid or quota.check("urlscan"):
         return None
     try:
-        response = requests.get(
-            f"https://urlscan.io/api/v1/result/{quote(str(uuid), safe='')}/",
-            headers={"API-Key": key} if key else {},
-            timeout=timeout,
-        )
+        response = _http("urlscan", "get", f"https://urlscan.io/api/v1/result/{quote(str(uuid), safe='')}/",
+                         headers={"API-Key": key} if key else {}, timeout=timeout)
         if response.status_code != 200:
             return None
         report = response.json()
     except (requests.RequestException, ValueError):
         return None
     return report if isinstance(report, dict) else None
+
+
+# --- MxToolbox --------------------------------------------------------------
+# Conta gratuita: 64 consultas DNS por dia e nenhuma de "rede" (blacklist, http,
+# smtp...), zerando à meia-noite UTC. Por isso só usamos comandos DNS: MX, SPF e
+# DMARC para domínios (3 consultas) e PTR para IPs (1 consulta).
+
+MXTOOLBOX_URL = "https://api.mxtoolbox.com/api/v1/Lookup"
+
+
+def _mxtoolbox_target(value, ioc_type):
+    """(alvo, comandos): domínio de URL/e-mail ou o próprio IP."""
+    host = related_host(value, ioc_type) or value
+    if ioc_type in IP_TYPES or detect_type(host) in IP_TYPES:
+        return host, ["ptr"]
+    return host, ["mx", "spf", "dmarc"]
+
+
+def query_mxtoolbox(value, ioc_type, key, timeout):
+    name = "MxToolbox"
+    target, commands = _mxtoolbox_target(value, ioc_type)
+    link = f"https://mxtoolbox.com/SuperTool.aspx?action={commands[0]}%3a{quote(target, safe='')}&run=toolpage"
+    lookups, notes = {}, []
+    for command in commands:
+        paused = quota.check("mxtoolbox")
+        if paused:  # não gasta mais consultas do que o plano gratuito permite
+            if not lookups:
+                return provider_result(name, "skipped", summary=paused, transient=True)
+            notes.append(f"{command.upper()} não consultado: {paused}")
+            break
+        response = _http("mxtoolbox", "get", f"{MXTOOLBOX_URL}/{command}/",
+                         headers={"Authorization": key, "Accept": "application/json"},
+                         params={"argument": target}, timeout=timeout)
+        if response.status_code != 200:
+            if lookups and response.status_code == 429:
+                notes.append(f"{command.upper()} não consultado: limite gratuito atingido")
+                break
+            return _http_problem(name, response, "mxtoolbox")
+        data = response.json()
+        if isinstance(data, dict):  # entrada inválida para o comando volta como texto
+            lookups[command] = data
+
+    if not lookups:
+        return provider_result(name, "not_found", summary="A MxToolbox não retornou registros para este alvo",
+                               link=link)
+    analysis = analyze_mxtoolbox(lookups)
+    summary = f"{target}: {analysis['summary']}" + (f" ({'; '.join(notes)})" if notes else "")
+    # Saúde de DNS e de e-mail é contexto, não reputação: não altera o veredito
+    return provider_result(
+        name, "ok", summary=summary, link=link,
+        details={"target": target, "commands": list(lookups)},
+        flags=analysis["flags"], facts=analysis["facts"], sections=analysis["sections"],
+        transient=bool(notes),
+    )
+
+
+# --- IPinfo -----------------------------------------------------------------
+# IPinfo Lite (plano gratuito): ASN, organização, domínio do AS, país e continente.
+
+def query_ipinfo(value, ioc_type, key, timeout):
+    name = "IPinfo"
+    link = f"https://ipinfo.io/{value}"
+    response = _http("ipinfo", "get", f"https://api.ipinfo.io/lite/{quote(value, safe=':')}",
+                     headers={"Authorization": f"Bearer {key}", "Accept": "application/json"},
+                     timeout=timeout)
+    if response.status_code == 404:
+        return provider_result(name, "not_found", summary="IP sem informações no IPinfo", link=link)
+    if response.status_code != 200:
+        return _http_problem(name, response, "ipinfo")
+    data = response.json()
+    if data.get("bogon"):
+        return provider_result(name, "not_found", summary="Endereço reservado (bogon), sem dono público", link=link)
+    analysis = analyze_ipinfo(data)
+    return provider_result(
+        name, "ok", summary=analysis["summary"], link=link,
+        details={"asn": data.get("asn"), "as_name": data.get("as_name"), "country": data.get("country_code")},
+        facts=analysis["facts"],
+    )
 
 
 # --- Registro das fontes ----------------------------------------------------
@@ -391,6 +533,7 @@ class Provider:
     key_required: bool
     signup_url: str
     description: str
+    terms: str
 
 
 ALL_TYPES = frozenset(IP_TYPES | HASH_TYPES | {"domain", "url"})
@@ -398,19 +541,33 @@ ALL_TYPES = frozenset(IP_TYPES | HASH_TYPES | {"domain", "url"})
 PROVIDERS = [
     Provider("virustotal", "VirusTotal", query_virustotal, ALL_TYPES, True,
              "https://www.virustotal.com/gui/join-us",
-             "Reputação em dezenas de antivírus e mecanismos de análise."),
+             "Reputação em dezenas de antivírus, categorias, sandboxes e regras YARA.",
+             "API pública: 4 consultas/min e 500/dia, apenas uso pessoal e não comercial."),
     Provider("abuseipdb", "AbuseIPDB", query_abuseipdb, frozenset(IP_TYPES), True,
              "https://www.abuseipdb.com/register",
-             "Denúncias da comunidade sobre IPs usados em ataques."),
+             "Denúncias da comunidade sobre IPs usados em ataques.",
+             "Conta gratuita: 1.000 consultas/dia."),
     Provider("threatfox", "ThreatFox", query_threatfox, ALL_TYPES, True,
              "https://auth.abuse.ch/",
-             "Base do abuse.ch com IOCs de malware, botnets e C2."),
-    Provider("hybrid_analysis", "Hybrid Analysis", query_hybrid_analysis, ALL_TYPES, True,
+             "Base do abuse.ch com IOCs de malware, botnets e C2.",
+             "Gratuito sob política de uso justo (fair use), sem fins comerciais."),
+    Provider("hybrid_analysis", "Hybrid Analysis", query_hybrid_analysis, frozenset(HASH_TYPES), True,
              "https://www.hybrid-analysis.com/signup",
-             "Relatórios de sandbox (execução de arquivos e URLs)."),
+             "Relatórios de sandbox e antivírus para arquivos (hash).",
+             "Chave gratuita (restricted): só buscas, 200/min e 2.000/hora."),
     Provider("urlscan", "URLScan.io", query_urlscan, frozenset(IP_TYPES | {"domain", "url", "sha256"}), False,
              "https://urlscan.io/user/signup",
-             "Varreduras públicas de sites; funciona sem chave, com limite menor."),
+             "Varreduras públicas de sites, com captura de tela; funciona sem chave.",
+             "Conta gratuita: 120 buscas/min; não é permitido copiar a base em massa."),
+    Provider("mxtoolbox", "MxToolbox", query_mxtoolbox, frozenset(IP_TYPES | {"domain", "url", "email"}), True,
+             "https://mxtoolbox.com/User/Api/",
+             "Registros de e-mail do domínio (MX, SPF e DMARC) e DNS reverso (PTR) de IPs.",
+             "Conta gratuita: 64 consultas DNS/dia (cada domínio usa 3) e nenhuma de rede, "
+             "por isso a verificação de blacklist não é usada."),
+    Provider("ipinfo", "IPinfo", query_ipinfo, frozenset(IP_TYPES), True,
+             "https://ipinfo.io/signup",
+             "Dono do IP: ASN, organização, domínio do provedor e país.",
+             "IPinfo Lite gratuito (ASN e país); o IOC Check limita a 60 consultas/min."),
 ]
 PROVIDERS_BY_ID = {p.id: p for p in PROVIDERS}
 
@@ -421,11 +578,13 @@ TEST_SAMPLES = {
     "threatfox": ("example.com", "domain"),
     "hybrid_analysis": ("275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f", "sha256"),
     "urlscan": ("example.com", "domain"),
+    "mxtoolbox": ("8.8.8.8", "ipv4"),  # PTR: gasta 1 das 64 consultas diárias, e não 3
+    "ipinfo": ("8.8.8.8", "ipv4"),
 }
 
 
 def provider_state(provider):
-    """Se a fonte está ativa e, se não estiver, o motivo."""
+    """Se a fonte está ativa, o motivo quando não está, e o consumo da cota gratuita."""
     enabled = settings.get(f"{provider.id}_enabled")
     has_key = bool(settings.get(f"{provider.id}_api_key"))
     if not enabled:
@@ -434,7 +593,8 @@ def provider_state(provider):
         reason = "Chave de API não configurada"
     else:
         reason = None
-    return {"enabled": enabled, "has_key": has_key, "active": reason is None, "reason": reason}
+    return {"enabled": enabled, "has_key": has_key, "active": reason is None, "reason": reason,
+            "usage": quota.usage(provider.id), "terms": provider.terms}
 
 
 def run_provider(provider, value, ioc_type, ignore_disabled=False):
@@ -448,6 +608,9 @@ def run_provider(provider, value, ioc_type, ignore_disabled=False):
         return provider_result(name, "skipped", summary="IP privado/reservado não é consultado")
     if provider.key_required and not state["has_key"]:
         return provider_result(name, "skipped", summary="Chave de API não configurada")
+    paused = quota.check(provider.id)
+    if paused:
+        return provider_result(name, "skipped", summary=paused, transient=True)
 
     key = settings.get(f"{provider.id}_api_key")
     timeout = settings.get("provider_timeout")

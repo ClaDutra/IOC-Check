@@ -112,6 +112,23 @@ class Setting(db.Model):
     updated_at = db.Column(db.DateTime, nullable=False, default=utcnow, onupdate=utcnow)
 
 
+class ProviderQuota(db.Model):
+    """Consumo de cada fonte externa, para respeitar os limites dos planos gratuitos."""
+
+    __tablename__ = "provider_quota"
+
+    provider = db.Column(db.String(32), primary_key=True)
+    day = db.Column(db.String(10), nullable=False, default="")  # dia UTC (AAAA-MM-DD)
+    day_calls = db.Column(db.Integer, nullable=False, default=0)
+    window_start = db.Column(db.DateTime)  # início da janela de 1 minuto
+    window_calls = db.Column(db.Integer, nullable=False, default=0)
+    blocked_until = db.Column(db.DateTime)  # pausa após "limite atingido" (HTTP 429)
+    remote_limit = db.Column(db.Integer)  # limite informado pela própria API
+    remote_remaining = db.Column(db.Integer)
+    remote_window = db.Column(db.String(16))
+    updated_at = db.Column(db.DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+
 class QueryLog(db.Model):
     """Histórico: cada consulta feita, inclusive as atendidas pelo cache."""
 
@@ -125,10 +142,23 @@ class QueryLog(db.Model):
     from_cache = db.Column(db.Boolean, nullable=False, default=False)
     # Data em que o resultado usado nesta consulta foi armazenado no cache
     cache_stored_at = db.Column(db.DateTime)
+    cache_expires_at = db.Column(db.DateTime)
+    # Cópia completa do resultado de cada fonte: o histórico continua com todos os
+    # dados (e os prints) mesmo depois que o cache expira ou é esvaziado
+    results_json = db.Column(db.Text)
     queried_at = db.Column(db.DateTime, nullable=False, default=utcnow, index=True)
 
-    def to_dict(self):
-        return {
+    @property
+    def results(self):
+        return json.loads(self.results_json) if self.results_json else []
+
+    @property
+    def stored_at(self):
+        """Momento em que os dados foram obtidos das fontes (usado nos prints)."""
+        return self.cache_stored_at or self.queried_at
+
+    def to_dict(self, include_results=False):
+        data = {
             "id": self.id,
             "indicator": self.indicator,
             "type": self.ioc_type,
@@ -136,5 +166,10 @@ class QueryLog(db.Model):
             "score": self.score,
             "from_cache": self.from_cache,
             "cache_stored_at": iso(self.cache_stored_at),
+            "cache_expires_at": iso(self.cache_expires_at),
             "queried_at": iso(self.queried_at),
+            "has_details": bool(self.results_json),
         }
+        if include_results:
+            data["results"] = self.results
+        return data

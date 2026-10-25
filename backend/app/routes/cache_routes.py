@@ -1,3 +1,9 @@
+"""Cache das consultas: funciona nos bastidores (não tem mais tela própria).
+
+A validade é configurada em Configurações → Prazos; os dados completos de cada
+consulta ficam no Histórico. Estas rotas alimentam o resumo e a limpeza do cache.
+"""
+
 from flask import Blueprint, jsonify, request
 
 from ..extensions import db
@@ -6,6 +12,11 @@ from ..services import cache
 from .utils import paginated
 
 bp = Blueprint("cache", __name__, url_prefix="/api/cache")
+
+
+@bp.get("/summary")
+def cache_summary():
+    return jsonify(cache.summary())
 
 
 @bp.get("")
@@ -23,11 +34,6 @@ def list_cache():
     data = paginated(query.order_by(CacheEntry.stored_at.desc(), CacheEntry.id.desc()))
     data["summary"] = cache.summary()
     return jsonify(data)
-
-
-@bp.get("/<int:entry_id>")
-def get_entry(entry_id):
-    return jsonify(db.get_or_404(CacheEntry, entry_id).to_dict(include_results=True))
 
 
 @bp.delete("/<int:entry_id>")

@@ -6,8 +6,9 @@ from app.extensions import db
 
 
 @pytest.fixture
-def app():
+def app(tmp_path):
     app = create_app(TestConfig)
+    app.config["CAPTURE_ROOT"] = str(tmp_path)  # prints de página vão para uma pasta temporária
     yield app
     with app.app_context():
         db.session.remove()

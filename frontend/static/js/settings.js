@@ -1,9 +1,36 @@
 // Botões da seção "Meus dados": cada um indica a rota e a pergunta de confirmação
 document.querySelectorAll("[data-clear]").forEach((button) =>
-  button.addEventListener("click", () => clearData(button.dataset.clear, button.dataset.question))
+  button.addEventListener("click", () => clearData(button.dataset.clear, button.dataset.question, loadCacheSummary))
 );
 
+// Resumo do cache (ele não tem mais tela própria: o histórico guarda os dados completos)
+async function loadCacheSummary() {
+  const box = document.getElementById("cache-stats");
+  try {
+    const s = await API.get("/api/cache/summary");
+    box.innerHTML = `
+      <div class="fact"><span>Válidos agora</span><strong>${s.valid}</strong></div>
+      <div class="fact"><span>Expirados</span><strong>${s.expired}</strong></div>
+      <div class="fact"><span>Reaproveitamentos</span><strong>${s.hits}</strong></div>
+      <div class="fact"><span>Validade</span><strong>${s.ttl_hours} hora(s)</strong></div>
+      <div class="fact"><span>Mais antigo</span><strong>${s.oldest_stored_at ? formatDate(s.oldest_stored_at) : "—"}</strong></div>`;
+  } catch (err) {
+    box.textContent = err.message;
+  }
+}
+
+document.getElementById("purge-cache-btn").addEventListener("click", async () => {
+  try {
+    toast((await API.post("/api/cache/purge-expired")).message, "success");
+    loadCacheSummary();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+});
+loadCacheSummary();
+
 function providerStatus(p) {
+  if (p.active && p.usage && p.usage.blocked_until) return '<span class="badge warn">Pausada</span>';
   if (p.active) return '<span class="badge good">Ativa</span>';
   if (!p.enabled) return '<span class="badge neutral">Desativada</span>';
   return '<span class="badge warn">Sem chave</span>';
@@ -29,7 +56,7 @@ function renderKeys(providers) {
       return `
         <tr data-id="${p.id}">
           <td class="nowrap">
-            <strong>${escapeHtml(p.name)}</strong><br>
+            <span class="provider-name">${sourceIcon(p.id)}<strong>${escapeHtml(p.name)}</strong></span>
             <span class="muted small">${p.key_required ? "obrigatória" : "opcional"} ·
               <a href="${escapeHtml(p.signup_url)}" target="_blank" rel="noopener">obter chave</a></span>
           </td>
@@ -53,17 +80,34 @@ function renderKeys(providers) {
     .join("");
 }
 
+// Consumo da cota gratuita: chamadas de hoje, limites do plano e o que a API informou
+function usageHtml(p) {
+  const u = p.usage || {};
+  const paused = u.blocked_until
+    ? `<p class="flag bad">Pausada até ${escapeHtml(formatDate(u.blocked_until))} (limite gratuito atingido)</p>`
+    : "";
+  return `
+    <div class="usage small">
+      <span><strong>${u.calls_today ?? 0}</strong> consulta(s) hoje</span>
+      ${u.free_limits ? `<span>Limite gratuito: ${escapeHtml(u.free_limits)}</span>` : ""}
+      ${u.remote ? `<span>API informa: ${escapeHtml(u.remote)}</span>` : ""}
+    </div>
+    ${paused}
+    <p class="small muted terms">${escapeHtml(p.terms || "")}</p>`;
+}
+
 function renderProviders(providers) {
   document.getElementById("providers").innerHTML = providers
     .map((p) => `
       <div class="card provider-card" data-id="${p.id}">
         <div class="card-head">
-          <h2>${escapeHtml(p.name)}</h2>
+          <h2 class="provider-name">${sourceIcon(p.id, "lg")}${escapeHtml(p.name)}</h2>
           ${providerStatus(p)}
         </div>
         <p class="muted small">${escapeHtml(p.description)}</p>
         <p class="small">Tipos: ${p.types.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join("")}</p>
         <p class="small muted">Chave: ${p.has_key ? "configurada" : p.key_required ? "não configurada (cadastre em Chaves de API)" : "opcional"}</p>
+        ${usageHtml(p)}
         <label class="checkbox">
           <input type="checkbox" data-action="enable" ${p.enabled ? "checked" : ""}> Usar esta fonte nas verificações
         </label>
@@ -81,6 +125,7 @@ async function saveSettings(body) {
   try {
     const data = await API.put("/api/settings", body);
     render(data);
+    loadCacheSummary();
     toast(data.message, "success");
   } catch (err) {
     toast(err.message, "error");

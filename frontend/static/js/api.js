@@ -128,8 +128,9 @@ function renderPagination(container, data, onChange) {
   );
 }
 
-// Linhas da tabela "fonte por fonte", usada na verificação e nos detalhes do cache.
-function providerRows(results) {
+// Linhas da tabela "fonte por fonte", usada na verificação e nos detalhes do histórico.
+// historyId identifica a consulta, usada nos prints de evidência e de página.
+function providerRows(results, historyId, captures = {}) {
   return results
     .map((r) => {
       const link = r.link && /^https:\/\//.test(r.link)
@@ -142,10 +143,10 @@ function providerRows(results) {
       const extras = providerDetails(r);
       return `
         <tr class="${extras ? "has-extras" : ""}">
-          <td class="nowrap"><strong>${escapeHtml(r.provider)}</strong></td>
-          <td>${statusBadge(r.status)}</td>
+          <td class="nowrap"><span class="provider-name">${sourceIcon(r.provider)}<strong>${escapeHtml(r.provider)}</strong></span></td>
+          <td>${r.transient ? '<span class="badge warn">Limite gratuito</span>' : statusBadge(r.status)}</td>
           <td>${r.status === "ok" ? verdictBadge(r.verdict) : "—"}</td>
-          <td>${escapeHtml(r.summary)}${escapeHtml(validity)}${link}${providerFlags(r)}</td>
+          <td>${escapeHtml(r.summary)}${escapeHtml(validity)}${link}${providerFlags(r)}${providerMedia(r)}${pageCaptureBlock(historyId, r, captures[r.provider])}${evidenceButtons(historyId, r)}</td>
         </tr>
         ${extras ? `<tr class="extras-row"><td colspan="4">${extras}</td></tr>` : ""}`;
     })
@@ -153,6 +154,32 @@ function providerRows(results) {
 }
 
 // Tudo abaixo vem de APIs externas, então todo texto passa por escapeHtml.
+
+// Captura de tela da página (URLScan.io). Só aceita imagens do próprio URLScan.io.
+const MEDIA_ORIGINS = ["https://urlscan.io/screenshots/"];
+
+function providerMedia(r) {
+  const images = (r.media || []).filter(
+    (m) => m.type === "image" && MEDIA_ORIGINS.some((origin) => String(m.url).startsWith(origin))
+  );
+  return images
+    .map((m) => {
+      const target = m.link && /^https:\/\//.test(m.link) ? m.link : m.url;
+      // Cópia local guardada na consulta: continua aparecendo mesmo se o site remover a imagem
+      const src = `/api/evidence/screenshot?url=${encodeURIComponent(m.url)}`;
+      return `
+        <figure class="screenshot">
+          <a href="${escapeHtml(src)}" target="_blank" rel="noopener" title="Abrir a imagem em tamanho real">
+            <img src="${escapeHtml(src)}" alt="${escapeHtml(m.caption || "Captura de tela")}" loading="lazy"
+                 onerror="this.closest('figure').classList.add('missing')">
+          </a>
+          <figcaption>${escapeHtml(m.caption || "")} ·
+            <a href="${escapeHtml(target)}" target="_blank" rel="noopener">relatório completo ↗</a></figcaption>
+          <p class="screenshot-missing small muted">O URLScan.io não guardou a captura desta varredura.</p>
+        </figure>`;
+    })
+    .join("");
+}
 
 // Alertas de comportamento, sempre visíveis ao lado do resumo da fonte.
 function providerFlags(r) {
@@ -249,3 +276,174 @@ async function clearData(url, question, onDone) {
     toast(err.message, "error");
   }
 }
+
+// --- Prints de evidência -----------------------------------------------------
+
+function evidenceUrl(historyId, provider) {
+  const query = provider ? `?provider=${encodeURIComponent(provider)}` : "";
+  return `/api/evidence/${historyId}.png${query}`;
+}
+
+// Botões de evidência de uma fonte (só para fontes que responderam)
+function evidenceButtons(historyId, r) {
+  // A base local não entra nos prints de evidência: eles mostram só as ferramentas
+  if (!historyId || r.provider === "Base local" || !["ok", "not_found"].includes(r.status)) return "";
+  const url = evidenceUrl(historyId, r.provider);
+  return evidenceActions(url, "resumo");
+}
+
+function evidenceActions(url, label, primary = false) {
+  const sep = url.includes("?") ? "&" : "?";
+  return `
+    <div class="evidence-actions${primary ? " primary" : ""}">
+      <button type="button" class="btn btn-sm${primary ? " btn-primary" : ""}" data-copy-evidence="${escapeHtml(url)}"
+              title="Copia a imagem para colar com Ctrl+V em documentos, e-mails ou chats">📋 Copiar ${escapeHtml(label)}</button>
+      <a class="btn btn-sm" href="${escapeHtml(url + sep)}download=1" title="Baixar a imagem (PNG)">⬇ Baixar</a>
+      <a class="btn btn-sm btn-ghost" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="Abrir a imagem em nova aba">Ver</a>
+    </div>`;
+}
+
+// Copia o PNG para a área de transferência. A promessa é passada direto ao
+// ClipboardItem para o navegador manter a permissão do clique durante o download.
+async function copyEvidence(url, button) {
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = "Gerando print…";
+  try {
+    const blob = fetch(url).then((response) => {
+      if (!response.ok) throw new Error(`Erro ${response.status}`);
+      return response.blob();
+    });
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    toast("Print copiado! Cole com Ctrl+V onde quiser.", "success");
+  } catch (err) {
+    window.open(url, "_blank", "noopener");
+    toast("Não deu para copiar direto: a imagem abriu em nova aba (botão direito → Copiar imagem).", "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
+}
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-copy-evidence]");
+  if (button) copyEvidence(button.dataset.copyEvidence, button);
+});
+
+// --- Print da página da fonte ----------------------------------------------
+
+// Mesmos sites aceitos pelo servidor (services/page_capture.py)
+const CAPTURE_HOSTS = ["www.virustotal.com", "www.abuseipdb.com", "threatfox.abuse.ch",
+                       "www.hybrid-analysis.com", "urlscan.io", "ipinfo.io"];
+
+function canCapture(r) {
+  try {
+    const url = new URL(r.link);
+    return url.protocol === "https:" && CAPTURE_HOSTS.includes(url.hostname);
+  } catch (_) {
+    return false;
+  }
+}
+
+// Prints de página seguem o prazo do cache: dentro dele, são reaproveitados nas novas consultas
+function captureValidity(capture) {
+  if (!capture.expires_at) return "";
+  if (capture.expired) return " · fora do prazo do cache (tire um novo print para atualizar)";
+  const reused = capture.reused_from ? "reaproveitado do cache, " : "";
+  return ` · ${reused}válido até ${escapeHtml(formatDate(capture.expires_at))}`;
+}
+
+function captureContent(capture, provider) {
+  if (!capture) return "";
+  const url = capture.image;
+  const sep = url.includes("?") ? "&" : "?";
+  return `
+    <figure class="screenshot page-shot">
+      <a href="${escapeHtml(url)}" target="_blank" rel="noopener" title="Abrir o print em tamanho real">
+        <img src="${escapeHtml(url + sep)}v=${encodeURIComponent(capture.captured_at)}" alt="Print da página de ${escapeHtml(provider)}" loading="lazy">
+      </a>
+      <figcaption>Página de ${escapeHtml(provider)} capturada em ${escapeHtml(formatDate(capture.captured_at))}${captureValidity(capture)}</figcaption>
+    </figure>
+    ${evidenceActions(url, "print da página")}`;
+}
+
+function pageCaptureBlock(historyId, r, capture) {
+  if (!historyId || !canCapture(r)) return "";
+  return `
+    <div class="page-capture" data-entry="${historyId}" data-provider="${escapeHtml(r.provider)}">
+      <button type="button" class="btn btn-sm btn-primary" data-capture-page>
+        📸 ${capture ? "Novo print da página" : "Print da página"} de ${escapeHtml(r.provider)}
+      </button>
+      <p class="capture-status small muted" hidden></p>
+      <div class="capture-result">${captureContent(capture, r.provider)}</div>
+    </div>`;
+}
+
+async function capturePage(block) {
+  const button = block.querySelector("[data-capture-page]");
+  const status = block.querySelector(".capture-status");
+  const provider = block.dataset.provider;
+  button.disabled = true;
+  status.hidden = false;
+  status.textContent = `Abrindo a página de ${provider} numa janela do navegador… Se aparecer ` +
+    `"Confirme que é humano", clique na caixa: o print é feito sozinho e a janela fecha.`;
+  try {
+    const capture = await API.post(`/api/capture/${block.dataset.entry}?provider=${encodeURIComponent(provider)}`);
+    block.querySelector(".capture-result").innerHTML = captureContent(capture, provider);
+    status.textContent = capture.needed_human
+      ? "Print feito depois da verificação do site."
+      : "Print feito.";
+    button.textContent = `📸 Novo print da página de ${provider}`;
+    toast(`Print da página de ${provider} pronto. Use "Copiar print da página".`, "success");
+  } catch (err) {
+    status.textContent = err.message;
+    toast(err.message, "error");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-capture-page]");
+  if (button) capturePage(button.closest(".page-capture"));
+});
+
+// --- Tema claro / escuro ---------------------------------------------------
+
+function currentTheme() {
+  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+}
+
+function renderThemeToggle() {
+  const button = document.getElementById("theme-toggle");
+  if (!button) return;
+  const dark = currentTheme() === "dark";
+  button.innerHTML = dark ? "☀️ <span>Claro</span>" : "🌙 <span>Escuro</span>";
+  button.title = dark ? "Usar o tema claro" : "Usar o tema escuro";
+}
+
+// --- Encerrar (o servidor roda em segundo plano, sem janela do CMD) ----------
+
+document.getElementById("shutdown-btn")?.addEventListener("click", async () => {
+  if (!confirm("Encerrar o IOC Check? Para abrir de novo, use o iniciar.bat.")) return;
+  try {
+    const data = await API.post("/api/system/shutdown");
+    document.querySelector("main.panel").innerHTML = `
+      <section class="card"><h1>IOC Check encerrado</h1>
+      <p class="muted">${escapeHtml(data.message)} Para abrir de novo, dê dois cliques no <code>iniciar.bat</code>.</p></section>`;
+  } catch (err) {
+    toast(err.message, "error");
+  }
+});
+
+document.getElementById("theme-toggle")?.addEventListener("click", () => {
+  const next = currentTheme() === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try {
+    localStorage.setItem("ioc-theme", next);
+  } catch (_) {
+    // navegação privada: o tema vale só para esta sessão
+  }
+  renderThemeToggle();
+});
+renderThemeToggle();

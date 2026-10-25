@@ -76,6 +76,7 @@ def test_provider(provider_id):
 
     value, ioc_type = TEST_SAMPLES[provider_id]
     result = run_provider(provider, value, ioc_type, ignore_disabled=True)
+    db.session.commit()  # grava o consumo da cota gratuita
     ok = result["status"] in ("ok", "not_found")
     if ok:
         message = f"Conexão com {provider.name} funcionando"

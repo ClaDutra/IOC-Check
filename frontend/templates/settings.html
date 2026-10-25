@@ -16,6 +16,22 @@
   <form id="general-form" class="form form-grid-3"></form>
 </section>
 
+<section class="card" id="cache">
+  <div class="card-head">
+    <h2>Cache das consultas</h2>
+    <div class="actions">
+      <button class="btn btn-sm" id="purge-cache-btn">Remover expirados</button>
+    </div>
+  </div>
+  <p class="muted small">
+    Todo IOC pesquisado e os prints de página tirados dele ficam guardados pelo tempo definido em
+    "Prazos e desempenho" (padrão 24 horas). Enquanto forem válidos, consultar o mesmo indicador de novo
+    não gasta a cota das APIs e já traz os prints prontos.
+    Os dados completos de cada consulta, com os prints, ficam sempre no Histórico.
+  </p>
+  <div class="facts cache-stats" id="cache-stats"><span class="muted small">Carregando…</span></div>
+</section>
+
 <section class="card">
   <h2>Chaves de API</h2>
   <p class="muted small">
@@ -60,7 +76,7 @@
   <div class="danger-row">
     <div>
       <strong>Limpar histórico</strong>
-      <p class="muted small">Apaga o registro de todas as consultas feitas.</p>
+      <p class="muted small">Apaga o registro de todas as consultas feitas, com os dados e os prints guardados.</p>
     </div>
     <button class="btn btn-danger" data-clear="/api/history"
             data-question="Apagar todo o histórico de consultas?">Limpar histórico</button>
@@ -68,7 +84,7 @@
   <div class="danger-row">
     <div>
       <strong>Esvaziar cache</strong>
-      <p class="muted small">As próximas consultas voltam a chamar as fontes externas.</p>
+      <p class="muted small">As próximas consultas voltam a chamar as fontes externas. O histórico não é afetado.</p>
     </div>
     <button class="btn btn-danger" data-clear="/api/cache"
             data-question="Remover todas as entradas do cache?">Esvaziar cache</button>

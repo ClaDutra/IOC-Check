@@ -1,0 +1,196 @@
+{
+  "UID": null,
+  "ArgumentType": "domain",
+  "Command": "spf",
+  "IsTransitioned": false,
+  "CommandArgument": "example.com",
+  "TimeRecorded": "2026-10-24T07:29:25.1878186-05:00",
+  "ReportingNameServer": "elliott.ns.cloudflare.com",
+  "TimeToComplete": "56",
+  "RelatedIP": null,
+  "ResourceRecordType": 16,
+  "IsEmptySubDomain": false,
+  "SPF_Subaction_Detail": {
+    "Void_lookups": [],
+    "Invalid_Redirects": null,
+    "Recursive_Paths": [],
+    "Invalid_Includes": null,
+    "Deprecated_SPF_Records": [],
+    "MX_Resource_Records": null,
+    "Modifier_Ignored": null,
+    "Included_Lookups": [],
+    "Duplicate_Includes": null
+  },
+  "Records": [
+    "v=spf1 -all"
+  ],
+  "IsEndpoint": false,
+  "HasSubscriptions": false,
+  "AlertgroupSubscriptionId": null,
+  "Failed": [],
+  "Warnings": [],
+  "Passed": [
+    {
+      "ID": 361,
+      "Name": "SPF Record Published",
+      "Info": "SPF Record found",
+      "Url": "https://mxtoolbox.com/Problem/spf/SPF-Record-Published?page=prob_spf&showlogin=1&hidetoc=1&action=spf:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    },
+    {
+      "ID": 355,
+      "Name": "SPF Record Deprecated",
+      "Info": "No deprecated records found",
+      "Url": "https://mxtoolbox.com/Problem/spf/SPF-Record-Deprecated?page=prob_spf&showlogin=1&hidetoc=1&action=spf:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    },
+    {
+      "ID": 358,
+      "Name": "SPF Multiple Records",
+      "Info": "Less than two records found",
+      "Url": "https://mxtoolbox.com/Problem/spf/SPF-Multiple-Records?page=prob_spf&showlogin=1&hidetoc=1&action=spf:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    },
+    {
+      "ID": 477,
+      "Name": "SPF Contains characters after ALL",
+      "Info": "No items after 'ALL'.",
+      "Url": "https://mxtoolbox.com/Problem/spf/SPF-Contains-characters-after-ALL?page=prob_spf&showlogin=1&hidetoc=1&action=spf:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    },
+    {
+      "ID": 356,
+      "Name": "SPF Syntax Check",
+      "Info": "The record is valid",
+      "Url": "https://mxtoolbox.com/Problem/spf/SPF-Syntax-Check?page=prob_spf&showlogin=1&hidetoc=1&action=spf:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    },
+    {
+      "ID": 421,
+      "Name": "SPF Included Lookups",
+      "Info": "Number of included lookups is OK",
+      "Url": "https://mxtoolbox.com/Problem/spf/SPF-Included-Lookups?page=prob_spf&showlogin=1&hidetoc=1&action=spf:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    },
+    {
+      "ID": 437,
+      "Name": "SPF Recursive Loop",
+      "Info": "Nor Recursive Loops on Includes",
+      "Url": "https://mxtoolbox.com/Problem/spf/SPF-Recursive-Loop?page=prob_spf&showlogin=1&hidetoc=1&action=spf:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    },
+    {
+      "ID": 439,
+      "Name": "SPF Duplicate Include",
+      "Info": "No Duplicate Includes Found",
+      "Url": "https://mxtoolbox.com/Problem/spf/SPF-Duplicate-Include?page=prob_spf&showlogin=1&hidetoc=1&action=spf:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    },
+    {
+      "ID": 509,
+      "Name": "SPF Type PTR Check",
+      "Info": "No type PTR found",
+      "Url": "https://mxtoolbox.com/Problem/spf/SPF-Type-PTR-Check?page=prob_spf&showlogin=1&hidetoc=1&action=spf:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    },
+    {
+      "ID": 511,
+      "Name": "SPF Void Lookups",
+      "Info": "Number of void lookups is OK",
+      "Url": "https://mxtoolbox.com/Problem/spf/SPF-Void-Lookups?page=prob_spf&showlogin=1&hidetoc=1&action=spf:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    },
+    {
+      "ID": 420,
+      "Name": "SPF MX Resource Records",
+      "Info": "Number of MX Resource Records is OK",
+      "Url": "https://mxtoolbox.com/Problem/spf/SPF-MX-Resource-Records?page=prob_spf&showlogin=1&hidetoc=1&action=spf:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    },
+    {
+      "ID": 418,
+      "Name": "SPF Record Null Value",
+      "Info": "No Null DNS Lookups found",
+      "Url": "https://mxtoolbox.com/Problem/spf/SPF-Record-Null-Value?page=prob_spf&showlogin=1&hidetoc=1&action=spf:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    }
+  ],
+  "Timeouts": [],
+  "Errors": [],
+  "IsError": false,
+  "Information": [
+    {
+      "Prefix": "",
+      "Type": "record",
+      "Value": "txt",
+      "PrefixDesc": "",
+      "Description": "v=spf1 -all",
+      "RecordNum": "1"
+    },
+    {
+      "Prefix": "",
+      "Type": "v",
+      "Value": "spf1",
+      "PrefixDesc": "",
+      "Description": "The SPF record version",
+      "RecordNum": null
+    },
+    {
+      "Prefix": "-",
+      "Type": "all",
+      "Value": "",
+      "PrefixDesc": "Fail",
+      "Description": "Always matches. It goes at the end of your record.",
+      "RecordNum": null
+    }
+  ],
+  "MultiInformation": [],
+  "Transcript": [
+    {
+      "Transcript": "- - - txt:example.com\r\n\r\n&emsp; 1 h.gtld-servers.net 192.54.112.30 NON-AUTH 23 ms Received 2 Referrals , rcode=NO_ERROR &emsp; example.com.\t172800\tIN\tNS\thera.ns.cloudflare.com,example.com.\t172800\tIN\tNS\telliott.ns.cloudflare.com,\r\n&emsp; 2 elliott.ns.cloudflare.com 108.162.195.228 AUTH 2 ms Received 2 Answers , rcode=NO_ERROR &emsp; example.com.\t300\tIN\tTXT\t_k2n1y4vw3qtb4skdx9e7dxt97qrmmq9,example.com.\t300\tIN\tTXT\tv=spf1 -all,\r\nRecord returned is a RFC 4408 TXT record.\r\nMAIL FROM: \r\nRETURN-PATH: \r\n\r\n- - Ranges\r\n\r\n- - Subqueries\r\n\r\n- - Results\r\nTXT:example.com = Fail\r\n\r\n- LookupServer [spf:example.com] 56ms \r\n"
+    }
+  ],
+  "MxRep": 0,
+  "EmailServiceProvider": null,
+  "DnsServiceProvider": "Cloudflare",
+  "DnsServiceProviderIdentifier": "cloudflare.com",
+  "CustomData": null,
+  "RelatedLookups": [
+    {
+      "Name": "dns lookup",
+      "URL": "https://mxtoolbox.com/api/v1/lookup/a/example.com",
+      "Command": "a",
+      "CommandArgument": "example.com"
+    },
+    {
+      "Name": "dns check",
+      "URL": "https://mxtoolbox.com/api/v1/lookup/dns/example.com",
+      "Command": "dns",
+      "CommandArgument": "example.com"
+    },
+    {
+      "Name": "mx lookup",
+      "URL": "https://mxtoolbox.com/api/v1/lookup/mx/example.com",
+      "Command": "mx",
+      "CommandArgument": "example.com"
+    },
+    {
+      "Name": "dns propagation",
+      "URL": "https://mxtoolbox.com/api/v1/lookup/spf/example.com:all",
+      "Command": "spf",
+      "CommandArgument": "example.com:all"
+    }
+  ]
+}

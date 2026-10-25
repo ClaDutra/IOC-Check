@@ -4,7 +4,7 @@ from datetime import datetime
 def test_list_settings_has_all_providers(client):
     data = client.get("/api/settings").get_json()
     names = [p["name"] for p in data["providers"]]
-    assert names == ["VirusTotal", "AbuseIPDB", "ThreatFox", "Hybrid Analysis", "URLScan.io"]
+    assert names == ["VirusTotal", "AbuseIPDB", "ThreatFox", "Hybrid Analysis", "URLScan.io", "MxToolbox", "IPinfo"]
     assert {g["key"] for g in data["general"]} == {
         "cache_ttl_hours", "cache_error_ttl_minutes", "provider_timeout", "ioc_default_expiration_days",
     }

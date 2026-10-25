@@ -24,6 +24,10 @@ def create_app(config_class=Config):
         static_folder=os.path.join(FRONTEND_DIR, "static"),
     )
     app.config.from_object(config_class)
+    # Relê os templates quando o arquivo muda, mesmo com o modo de depuração desligado
+    # (sem isso, um servidor antigo continuaria mostrando o HTML de antes da atualização)
+    app.config["TEMPLATES_AUTO_RELOAD"] = True
+    app.jinja_env.auto_reload = True
 
     os.makedirs(app.instance_path, exist_ok=True)
     if not app.config.get("SQLALCHEMY_DATABASE_URI"):
@@ -35,6 +39,15 @@ def create_app(config_class=Config):
     from .routes import register_blueprints
 
     register_blueprints(app)
+
+    @app.url_defaults
+    def static_version(endpoint, values):
+        # CSS e JS ganham ?v=<data do arquivo>: o navegador baixa a versão nova sempre que
+        # o arquivo muda, em vez de usar uma cópia antiga guardada
+        if endpoint == "static" and "filename" in values and "v" not in values:
+            path = os.path.join(app.static_folder, values["filename"])
+            if os.path.isfile(path):
+                values["v"] = int(os.path.getmtime(path))
 
     @app.before_request
     def require_app_header():
@@ -71,6 +84,10 @@ def create_app(config_class=Config):
         db.create_all()
         _upgrade_schema()
 
+        from .services import history
+
+        history.backfill()
+
     return app
 
 
@@ -78,6 +95,7 @@ def create_app(config_class=Config):
 # tabelas existentes, então elas são acrescentadas aqui em bancos antigos.
 NEW_COLUMNS = {
     "iocs": {"expires_at": "DATETIME"},
+    "query_logs": {"results_json": "TEXT", "cache_expires_at": "DATETIME"},
 }
 
 

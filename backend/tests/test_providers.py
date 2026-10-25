@@ -7,9 +7,10 @@ from app.services import providers
 
 
 class FakeResponse:
-    def __init__(self, status_code=200, payload=None):
+    def __init__(self, status_code=200, payload=None, headers=None):
         self.status_code = status_code
         self._payload = payload
+        self.headers = headers or {}
 
     def json(self):
         return self._payload
@@ -47,7 +48,9 @@ def run(app, provider_id, value, ioc_type, key="chave-teste"):
         db.session.merge(Setting(key=f"{provider_id}_api_key", value=key))
         db.session.merge(Setting(key=f"{provider_id}_enabled", value="1"))
         db.session.commit()
-        return providers.run_provider(providers.PROVIDERS_BY_ID[provider_id], value, ioc_type)
+        result = providers.run_provider(providers.PROVIDERS_BY_ID[provider_id], value, ioc_type)
+        db.session.commit()  # como o app faz ao fim de cada verificação (grava o consumo da cota)
+        return result
 
 
 def test_threatfox_malicious(app, fake_http):
@@ -79,37 +82,42 @@ def test_threatfox_hash_uses_search_hash(app, fake_http):
     assert fake_http["calls"][0][2]["json"]["query"] == "search_hash"
 
 
-def test_hybrid_analysis_worst_verdict(app, fake_http):
-    fake_http["response"] = FakeResponse(200, [
-        {"verdict": "no specific threat", "threat_score": 10},
-        {"verdict": "malicious", "threat_score": 95, "vx_family": "Trojan.Generic"},
-    ])
+def test_hybrid_analysis_uses_search_and_overview(app, fake_http):
+    fake_http["response"] = {
+        "/search/hash": FakeResponse(200, {"sha256s": ["a" * 64], "reports": [{"state": "SUCCESS", "verdict": "malicious"}]}),
+        "/overview/": FakeResponse(200, {"verdict": "malicious", "threat_score": 95, "vx_family": "Trojan.Generic"}),
+    }
     result = run(app, "hybrid_analysis", "44d88612fea8a8f36de82e1278abb02f", "md5")
     assert result["verdict"] == "malicious"
     assert result["score"] == 95
     assert "Trojan.Generic" in result["summary"]
+    assert fake_http["calls"][1][1].endswith("/overview/" + "a" * 64)
 
 
-def test_hybrid_analysis_terms_for_domain(app, fake_http):
-    fake_http["response"] = FakeResponse(200, {"count": 0, "result": []})
+def test_hybrid_analysis_only_checks_hashes(app, fake_http):
+    # Chaves gratuitas ("restricted") não têm acesso à busca por IP, domínio ou URL
     result = run(app, "hybrid_analysis", "example.com", "domain")
-    assert result["status"] == "not_found"
-    method, url, kwargs = fake_http["calls"][0]
-    assert url.endswith("/search/terms") and kwargs["data"] == {"domain": "example.com"}
+    assert result["status"] == "skipped"
+    assert fake_http["calls"] == []
+
+
+def test_hybrid_analysis_unknown_hash(app, fake_http):
+    fake_http["response"] = FakeResponse(200, {"sha256s": [], "reports": []})
+    assert run(app, "hybrid_analysis", "a" * 64, "sha256")["status"] == "not_found"
 
 
 def test_urlscan_counts_malicious(app, fake_http):
     fake_http["response"] = FakeResponse(200, {
         "total": 3,
         "results": [
-            {"verdicts": {"overall": {"malicious": True}}, "result": "https://urlscan.io/result/1/"},
+            {"_id": "uuid-1", "verdicts": {"overall": {"malicious": True}}, "result": "https://urlscan.io/api/v1/result/uuid-1/"},
             {"verdicts": {"overall": {"malicious": True}}},
             {"verdicts": {"overall": {"malicious": False}}},
         ],
     })
     result = run(app, "urlscan", "phishing.example", "domain", key="")
     assert result["verdict"] == "malicious"
-    assert result["link"] == "https://urlscan.io/result/1/"
+    assert result["link"] == "https://urlscan.io/result/uuid-1/"  # página do relatório, não a API
     assert "API-Key" not in fake_http["calls"][0][2]["headers"]
 
 

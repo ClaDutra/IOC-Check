@@ -9,7 +9,7 @@ def check(client, indicators, force=False):
 
 
 def test_pages_open_without_login(client):
-    for path in ("/", "/check", "/iocs", "/history", "/cache", "/settings"):
+    for path in ("/", "/check", "/iocs", "/history", "/settings"):
         assert client.get(path).status_code == 200
     assert client.get("/login").status_code == 404
 

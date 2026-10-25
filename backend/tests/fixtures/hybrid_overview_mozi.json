@@ -1,0 +1,187 @@
+{
+ "sha256": "4293c1d8574dc87c58360d6bac3daa182f64f7785c9d41da5e0741d2b1817fc7",
+ "last_file_name": "bin.sh",
+ "other_file_name": [
+  "115.50.4.8257595",
+  "115.55.228.8447374",
+  "115.55.235.25151316",
+  "115.55.4.23648856",
+  "117.201.20.18560509",
+  "117.248.164.5741089",
+  "123.235.241.6058811",
+  "123.4.198.840458"
+ ],
+ "threat_score": null,
+ "verdict": "malicious",
+ "url_analysis": false,
+ "size": 135784,
+ "type": "ELF 32-bit MSB executable, MIPS, MIPS-I version 1 (SYSV), statically linked, no section header",
+ "type_short": [
+  "elf",
+  "executable"
+ ],
+ "submitted_at": "2024-04-20T06:29:37+00:00",
+ "analysis_start_time": "2026-10-11T17:39:26+00:00",
+ "last_multi_scan": "2026-10-11T17:39:42+00:00",
+ "tags": [
+  "urlscanio",
+  "malware_download"
+ ],
+ "architecture": null,
+ "vx_family": "Trojan/Linux.Mirai",
+ "multiscan_result": 85,
+ "scanners": [
+  {
+   "name": "CrowdStrike Falcon Static Analysis (ML)",
+   "status": "error",
+   "status_raw": "error",
+   "error_message": "Submitted file failed validation, given file is unsupported",
+   "progress": 100,
+   "total": null,
+   "positives": null,
+   "percent": null,
+   "anti_virus_results": []
+  },
+  {
+   "name": "Metadefender",
+   "status": "malicious",
+   "status_raw": "malicious",
+   "error_message": null,
+   "progress": 100,
+   "total": 23,
+   "positives": 16,
+   "percent": 69,
+   "anti_virus_results": []
+  }
+ ],
+ "scanners_v2": {
+  "crowdstrike_ml": {
+   "name": "CrowdStrike Falcon Static Analysis (ML)",
+   "status": "error",
+   "status_raw": "error",
+   "error_message": "Submitted file failed validation, given file is unsupported",
+   "progress": 100,
+   "percent": null,
+   "anti_virus_results": []
+  },
+  "metadefender": {
+   "name": "Metadefender",
+   "status": "malicious",
+   "status_raw": "malicious",
+   "error_message": null,
+   "progress": 100,
+   "total": 23,
+   "positives": 16,
+   "percent": 69,
+   "anti_virus_results": []
+  },
+  "virustotal": null,
+  "urlscan_io": null,
+  "scam_adviser": null,
+  "clean_dns": null,
+  "bfore_ai": null,
+  "criminal_ip": null,
+  "vipre": null
+ },
+ "submit_context": [
+  "http://222.137.118.24:49606/bin.sh",
+  "http://117.196.163.132:43557/Mozi.m",
+  "http://176.74.66.248:55443/Mozi.m",
+  "http://27.215.84.3:40004/i",
+  "http://61.52.37.27:36141/i",
+  "http://27.215.84.3:40004/bin.sh",
+  "http://176.74.81.66:45429/Mozi.m",
+  "http://123.13.6.251:55140/Mozi.a"
+ ],
+ "related_parent_hashes": [],
+ "related_children_hashes": [],
+ "reports": [
+  "6acbc9ce98d99f6b910ba84b",
+  "6acbc9b598d99f6b910ba83e",
+  "6acbc8b5805de77ba80971c1",
+  "6acbc8729dcc8f7ae4060167",
+  "6acbc76f14a0dc6efd0cf009",
+  "6acbc76388a767d3530c1d71",
+  "6acbc660cc196e4c62006d1d",
+  "6acbc65347a2feabd606643c"
+ ],
+ "whitelisted": false,
+ "children_in_queue": 0,
+ "children_in_progress": 0,
+ "community_score_votes_down": 0,
+ "community_score_votes_up": 0,
+ "related_reports": [
+  {
+   "job_id": "62bef79a03538320d52f6645",
+   "environment_id": 110,
+   "state": "SUCCESS",
+   "error_type": null,
+   "error_origin": null,
+   "sha256": "01936a25aa2ee5137f9b86aee4085f9e89ea9bb1afd54ddb1e53756e2b89e866",
+   "verdict": "suspicious"
+  },
+  {
+   "job_id": "645744941283fb9358040fa9",
+   "environment_id": 110,
+   "state": "SUCCESS",
+   "error_type": null,
+   "error_origin": null,
+   "sha256": "02be8980e6e3b2646038e13feb84e1e47add901d99a74c95cc518255e94e36d8",
+   "verdict": "malicious"
+  },
+  {
+   "job_id": "64b403b63d4d48a138094eb0",
+   "environment_id": 110,
+   "state": "SUCCESS",
+   "error_type": null,
+   "error_origin": null,
+   "sha256": "02c39240bd87828f6afb6e2ed085ab12734f3a8ec67b2467e5c2069c0b7b987e",
+   "verdict": "no verdict"
+  },
+  {
+   "job_id": "627e62b8479b00169e04b4bb",
+   "environment_id": 110,
+   "state": "SUCCESS",
+   "error_type": null,
+   "error_origin": null,
+   "sha256": "03e31eac86df9f2d786ad0ca71949a6b4a2d70dda2f4f5206a1b7203970a1ebc",
+   "verdict": "malicious"
+  },
+  {
+   "job_id": "640b93934f5b0abbec06f9db",
+   "environment_id": 110,
+   "state": "SUCCESS",
+   "error_type": null,
+   "error_origin": null,
+   "sha256": "052be1158e3a4d0b0ddef1dde8db77705389027e9686f1d611afe56d0be54f05",
+   "verdict": "suspicious"
+  },
+  {
+   "job_id": "645744cf0606a6c1b6080770",
+   "environment_id": 110,
+   "state": "SUCCESS",
+   "error_type": null,
+   "error_origin": null,
+   "sha256": "06c591fdf3a80a85b56682f6a20a31b3a25a46b9c92a52c94726368be6723d0d",
+   "verdict": "malicious"
+  },
+  {
+   "job_id": "62f063e599b0c310086af498",
+   "environment_id": 110,
+   "state": "SUCCESS",
+   "error_type": null,
+   "error_origin": null,
+   "sha256": "06d31609af5c520fabb3b8ba0cd02c6446b657f4d41deba790388eb15b3e9da1",
+   "verdict": "malicious"
+  },
+  {
+   "job_id": "647cd0bbd1a7e7ed62035add",
+   "environment_id": 110,
+   "state": "SUCCESS",
+   "error_type": null,
+   "error_origin": null,
+   "sha256": "09e7b8b10c681806a5635417bf521e71bc9ef79190edb77204306271efd2f728",
+   "verdict": "malicious"
+  }
+ ]
+}

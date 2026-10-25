@@ -28,7 +28,8 @@ function cacheNote(r) {
     return `Resultado do <strong>cache</strong>, armazenado em ${formatDate(r.stored_at)} (${relativeTime(r.stored_at)}).
             Expira em ${formatDate(r.expires_at)}. Reaproveitado ${r.hits} vez(es).`;
   }
-  return `Consulta nova, armazenada no cache em ${formatDate(r.stored_at)}. Válida até ${formatDate(r.expires_at)}.`;
+  return `Consulta nova, armazenada no cache em ${formatDate(r.stored_at)}. Válida até ${formatDate(r.expires_at)}.
+          Os dados e os prints ficam guardados no <a href="/history">Histórico</a>.`;
 }
 
 function renderResult(r) {
@@ -58,12 +59,15 @@ function renderResult(r) {
             ${r.input !== r.indicator ? `<span>entrada original: <code>${escapeHtml(r.input)}</code></span>` : ""}
           </div>
         </div>
-        ${scoreBar(r.score, verdict.cls)}
+        <div class="result-side">
+          ${scoreBar(r.score, verdict.cls)}
+          ${r.history_id ? evidenceActions(evidenceUrl(r.history_id), "evidência completa", true) : ""}
+        </div>
       </div>
       <div class="table-wrap provider-table">
         <table class="table">
           <thead><tr><th>Fonte</th><th>Status</th><th>Veredito</th><th>Detalhe</th></tr></thead>
-          <tbody>${providerRows(r.results)}</tbody>
+          <tbody>${providerRows(r.results, r.history_id, r.captures || {})}</tbody>
         </table>
       </div>
       <p class="cache-note">${cacheNote(r)}</p>

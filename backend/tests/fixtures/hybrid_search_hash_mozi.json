@@ -1,0 +1,52 @@
+{
+ "sha256s": [
+  "4293c1d8574dc87c58360d6bac3daa182f64f7785c9d41da5e0741d2b1817fc7"
+ ],
+ "reports": [
+  {
+   "id": "6acbc9ce98d99f6b910ba84b",
+   "environment_id": 160,
+   "environment_description": "Windows 10 64 bit",
+   "state": "ERROR",
+   "error_type": "FILE_TYPE_BAD_ERROR",
+   "error_origin": "CLIENT",
+   "verdict": null
+  },
+  {
+   "id": "6acbc9b598d99f6b910ba83e",
+   "environment_id": 160,
+   "environment_description": "Windows 10 64 bit",
+   "state": "ERROR",
+   "error_type": "FILE_TYPE_BAD_ERROR",
+   "error_origin": "CLIENT",
+   "verdict": null
+  },
+  {
+   "id": "6acbc8b5805de77ba80971c1",
+   "environment_id": 160,
+   "environment_description": "Windows 10 64 bit",
+   "state": "ERROR",
+   "error_type": "FILE_TYPE_BAD_ERROR",
+   "error_origin": "CLIENT",
+   "verdict": null
+  },
+  {
+   "id": "6acbc8729dcc8f7ae4060167",
+   "environment_id": 160,
+   "environment_description": "Windows 10 64 bit",
+   "state": "ERROR",
+   "error_type": "FILE_TYPE_BAD_ERROR",
+   "error_origin": "CLIENT",
+   "verdict": null
+  },
+  {
+   "id": "6acbc76f14a0dc6efd0cf009",
+   "environment_id": 160,
+   "environment_description": "Windows 10 64 bit",
+   "state": "ERROR",
+   "error_type": "FILE_TYPE_BAD_ERROR",
+   "error_origin": "CLIENT",
+   "verdict": null
+  }
+ ]
+}

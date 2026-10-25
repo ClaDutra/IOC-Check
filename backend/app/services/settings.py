@@ -11,11 +11,11 @@ from flask import current_app, g
 from ..extensions import db
 from ..models import Setting
 
-PROVIDER_IDS = ("virustotal", "abuseipdb", "threatfox", "hybrid_analysis", "urlscan")
+PROVIDER_IDS = ("virustotal", "abuseipdb", "threatfox", "hybrid_analysis", "urlscan", "mxtoolbox", "ipinfo")
 
 GENERAL = {
     "cache_ttl_hours": {
-        "label": "Validade do cache (horas)",
+        "label": "Tempo que cada IOC pesquisado e os prints de página ficam no cache (horas, padrão 24)",
         "config": "CACHE_TTL_HOURS",
         "min": 1,
         "max": 720,

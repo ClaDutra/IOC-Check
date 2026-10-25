@@ -22,7 +22,8 @@ def get_valid(indicator):
 
 
 def store(indicator, ioc_type, verdict, score, results):
-    if any(r["status"] == "error" for r in results):
+    # Falhas e pausas por limite gratuito (transient) expiram rápido, para tentar de novo em breve
+    if any(r["status"] == "error" or r.get("transient") for r in results):
         ttl = timedelta(minutes=settings.get("cache_error_ttl_minutes"))
     else:
         ttl = timedelta(hours=settings.get("cache_ttl_hours"))

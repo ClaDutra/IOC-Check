@@ -4,13 +4,14 @@
 2. Procura um resultado válido no cache (a menos que force_refresh=True).
 3. Se não houver, consulta a base local + provedores externos e consolida o veredito.
 4. Armazena o resultado no cache com a data de armazenamento.
-5. Registra a consulta no histórico (query_logs).
+5. Registra a consulta no histórico (query_logs) com uma cópia completa do
+   resultado, para o histórico manter todos os dados mesmo após o cache expirar.
 """
 
 from ..extensions import db
 from ..ioc_utils import normalize, parse_input, related_host
 from ..models import Ioc, QueryLog, iso
-from . import cache
+from . import cache, media
 from .providers import VERDICT_ORDER, provider_result, run_all
 
 SEVERITY_SCORE = {"critical": 100, "high": 85, "medium": 60, "low": 35}
@@ -88,21 +89,26 @@ def check_indicator(raw, force_refresh=False):
         results = analyze(value, ioc_type)
         verdict, score = consolidate(results)
         entry = cache.store(value, ioc_type, verdict, score, results)
+        media.archive_results(results)  # cópia local das capturas de tela
 
-    db.session.add(
-        QueryLog(
-            indicator=value,
-            ioc_type=ioc_type,
-            verdict=entry.verdict,
-            score=entry.score,
-            from_cache=from_cache,
-            cache_stored_at=entry.stored_at,
-        )
+    log = QueryLog(
+        indicator=value,
+        ioc_type=ioc_type,
+        verdict=entry.verdict,
+        score=entry.score,
+        from_cache=from_cache,
+        cache_stored_at=entry.stored_at,
+        cache_expires_at=entry.expires_at,
+        results_json=entry.results_json,
     )
+    db.session.add(log)
+    db.session.flush()  # gera os ids usados nos prints de evidência e de página
 
     return {
         "input": raw,
         "valid": True,
+        "history_id": log.id,
+        "cache_id": entry.id,
         "indicator": value,
         "type": ioc_type,
         "verdict": entry.verdict,

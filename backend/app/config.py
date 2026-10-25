@@ -22,12 +22,18 @@ class Config:
     THREATFOX_API_KEY = os.getenv("THREATFOX_API_KEY", "").strip()
     HYBRID_ANALYSIS_API_KEY = os.getenv("HYBRID_ANALYSIS_API_KEY", "").strip()
     URLSCAN_API_KEY = os.getenv("URLSCAN_API_KEY", "").strip()
+    MXTOOLBOX_API_KEY = os.getenv("MXTOOLBOX_API_KEY", "").strip()
+    IPINFO_API_KEY = os.getenv("IPINFO_API_KEY", "").strip()
     PROVIDER_TIMEOUT = int(os.getenv("PROVIDER_TIMEOUT", "8"))
 
     # Validade padrão de um IOC cadastrado sem prazo informado (0 = nunca expira)
     IOC_DEFAULT_EXPIRATION_DAYS = int(os.getenv("IOC_DEFAULT_EXPIRATION_DAYS", "90"))
 
     MAX_INDICATORS_PER_CHECK = 50
+
+    # Guarda uma cópia local das capturas de tela do URLScan.io no momento da consulta,
+    # para o histórico continuar com a imagem mesmo que o site a remova depois
+    ARCHIVE_MEDIA = True
 
 
 class TestConfig(Config):
@@ -38,5 +44,8 @@ class TestConfig(Config):
     THREATFOX_API_KEY = ""
     HYBRID_ANALYSIS_API_KEY = ""
     URLSCAN_API_KEY = ""
+    MXTOOLBOX_API_KEY = ""
+    IPINFO_API_KEY = ""
     # Nos testes nenhuma chamada de rede é feita, a menos que o teste simule a API
     URLSCAN_ENABLED_BY_DEFAULT = False
+    ARCHIVE_MEDIA = False

@@ -1,14 +1,21 @@
-import csv
-import io
-from datetime import datetime
-
 from flask import Blueprint, Response, jsonify, request
 
 from ..extensions import db
 from ..models import QueryLog
-from .utils import paginated
+from ..services import history
+from .utils import json_body, paginated
 
 bp = Blueprint("history", __name__, url_prefix="/api/history")
+
+
+def _ids(raw):
+    """Lista de ids vinda de "1,2,3" (query string) ou de uma lista JSON."""
+    if isinstance(raw, str):
+        raw = raw.split(",")
+    try:
+        return [int(i) for i in raw or [] if str(i).strip()]
+    except (TypeError, ValueError):
+        return None
 
 
 def _filtered_query():
@@ -30,37 +37,54 @@ def list_history():
     return jsonify(paginated(_filtered_query()))
 
 
+@bp.get("/<int:log_id>")
+def get_entry(log_id):
+    return jsonify(history.detail(db.get_or_404(QueryLog, log_id)))
+
+
+@bp.delete("/<int:log_id>")
+def delete_entry(log_id):
+    db.get_or_404(QueryLog, log_id)
+    history.delete([log_id])
+    db.session.commit()
+    return jsonify(message="Consulta removida do histórico")
+
+
+@bp.post("/delete")
+def delete_selected():
+    ids = _ids(json_body().get("ids"))
+    if not ids:
+        return jsonify(error="Selecione ao menos uma consulta"), 400
+    removed = history.delete(ids)
+    db.session.commit()
+    return jsonify(removed=removed, message=f"{removed} consulta(s) removida(s) do histórico")
+
+
 @bp.delete("")
 def clear_history():
-    removed = QueryLog.query.delete(synchronize_session=False)
+    removed = history.clear_all()
     db.session.commit()
     return jsonify(removed=removed, message=f"Histórico apagado ({removed} consulta(s))")
 
 
 @bp.get("/export")
 def export_history():
-    buffer = io.StringIO()
-    # Ponto e vírgula + BOM para abrir corretamente no Excel em português
-    buffer.write("﻿")
-    writer = csv.writer(buffer, delimiter=";")
-    writer.writerow(
-        ["Data da consulta (UTC)", "Indicador", "Tipo", "Veredito", "Score",
-         "Origem", "Resultado armazenado em (UTC)"]
-    )
-    for log in _filtered_query().limit(10000):
-        writer.writerow([
-            log.queried_at.strftime("%Y-%m-%d %H:%M:%S"),
-            log.indicator,
-            log.ioc_type,
-            log.verdict,
-            log.score,
-            "cache" if log.from_cache else "consulta nova",
-            log.cache_stored_at.strftime("%Y-%m-%d %H:%M:%S") if log.cache_stored_at else "",
-        ])
+    """Exporta as consultas escolhidas.
 
-    filename = f"historico_ioc_{datetime.now():%Y%m%d_%H%M}.csv"
-    return Response(
-        buffer.getvalue(),
-        mimetype="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
+    ?ids=1,2,3 exporta só essas consultas (sem ids, todas as do filtro atual);
+    ?include=summary,sources,json,evidence,pages escolhe o conteúdo (padrão: summary).
+    """
+    query = _filtered_query()
+    if request.args.get("ids"):
+        ids = _ids(request.args["ids"])
+        if ids is None:
+            return jsonify(error="Lista de consultas inválida"), 400
+        query = query.filter(QueryLog.id.in_(ids))
+    parts = [p for p in request.args.get("include", "summary").split(",") if p]
+    unknown = set(parts) - set(history.EXPORT_PARTS)
+    if unknown:
+        return jsonify(error=f"Conteúdo desconhecido: {', '.join(sorted(unknown))}"), 400
+
+    content, filename, mimetype = history.export(query.limit(history.MAX_EXPORT).all(), parts)
+    return Response(content, mimetype=mimetype,
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})

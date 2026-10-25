@@ -1,6 +1,8 @@
 from flask import Blueprint, current_app, jsonify
 
+from ..extensions import db
 from ..ioc_utils import parse_input
+from ..services import page_capture
 from ..services.checker import check_many
 from .utils import json_body
 
@@ -22,6 +24,14 @@ def check():
         return jsonify(error=f"Máximo de {limit} indicadores por consulta"), 400
 
     results = check_many(items, force_refresh)
+    for result in results:
+        if not result.get("valid"):
+            continue
+        # Prints de página ainda dentro do prazo do cache são reaproveitados;
+        # "forçar nova consulta" começa sem eles, assim como ignora o cache
+        result["captures"] = {} if force_refresh else page_capture.reuse_recent(
+            result["history_id"], result["indicator"], [r["provider"] for r in result["results"]])
+    db.session.commit()
     return jsonify(
         results=results,
         summary={

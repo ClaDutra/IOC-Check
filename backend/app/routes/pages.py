@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, redirect, render_template, url_for
 
 bp = Blueprint("pages", __name__)
 
@@ -25,7 +25,8 @@ def history_page():
 
 @bp.get("/cache")
 def cache_page():
-    return render_template("cache.html", active="cache")
+    # A tela de cache foi removida: o histórico guarda tudo e a validade fica nas configurações
+    return redirect(url_for("pages.settings_page") + "#cache")
 
 
 @bp.get("/settings")

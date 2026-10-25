@@ -1,5 +1,4 @@
 const VERDICT_ICON = { malicious: "!", suspicious: "?", clean: "✓", unknown: "–" };
-const SOURCE_INITIALS = { virustotal: "VT", abuseipdb: "AB", threatfox: "TF", hybrid_analysis: "HA", urlscan: "US" };
 
 function barList(container, entries, classFor) {
   if (!entries.length) {
@@ -83,12 +82,87 @@ function renderActivity(container, recent) {
     .join("");
 }
 
-function renderSources(container, providers) {
-  const local = '<span class="source-dot local" title="Base local · ativa">BL</span>';
-  container.innerHTML = local + providers
-    .map((p) => `<span class="source-dot ${p.active ? "on" : ""}" title="${escapeHtml(p.name)} · ${escapeHtml(p.reason || "ativa")}">${SOURCE_INITIALS[p.id] || "?"}</span>`)
-    .join("");
+// Hub "Fontes conectadas": base local + ferramentas ligadas ao IOC Check
+function hubCard(item) {
+  const paused = item.usage && item.usage.blocked_until;
+  const state = paused ? "paused" : item.active ? "on" : "off";
+  let sub;
+  if (item.id === "local") sub = item.sub;
+  else if (paused) sub = "Pausada · limite gratuito";
+  else if (item.active) sub = `Ativa · ${item.usage ? item.usage.calls_today : 0} consulta(s) hoje`;
+  else sub = item.reason || "Inativa";
+  return `
+    <a class="hub-card ${state}" href="${item.href}" title="${escapeHtml(item.name)}: ${escapeHtml(sub)}">
+      ${sourceIcon(item.id, "lg")}
+      <span class="hub-text"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(sub)}</span></span>
+      <span class="hub-action" aria-hidden="true">${item.active ? "↗" : "+"}</span>
+    </a>`;
 }
+
+function renderHub(data) {
+  const items = [
+    { id: "local", name: "Base local", active: true, href: "/iocs",
+      sub: `${data.iocs.active} IOC(s) ativo(s)` },
+    ...data.providers.map((p) => ({ ...p, href: "/settings" })),
+  ];
+  const half = Math.ceil(items.length / 2);
+  document.getElementById("hub-left").innerHTML = items.slice(0, half).map(hubCard).join("");
+  document.getElementById("hub-right").innerHTML = items.slice(half).map(hubCard).join("");
+  const active = data.providers.filter((p) => p.active).length;
+  document.getElementById("hub-count").textContent = `${active} de ${data.providers.length} ferramentas ativas`;
+  drawHubLines();
+}
+
+// Linhas que ligam cada cartão ao escudo central. São calculadas com a posição real
+// dos elementos na tela, então ficam alinhadas em qualquer largura de janela.
+function drawHubLines() {
+  const hub = document.getElementById("hub");
+  const logo = hub && hub.querySelector(".core-logo");
+  if (!logo) return;
+  let svg = hub.querySelector(".hub-lines");
+  if (!svg) {
+    svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.classList.add("hub-lines");
+    svg.setAttribute("aria-hidden", "true");
+    hub.prepend(svg);
+  }
+  if (getComputedStyle(svg).display === "none") return; // telas estreitas: hub em pilha, sem linhas
+
+  const box = hub.getBoundingClientRect();
+  const orb = logo.getBoundingClientRect();
+  const cx = orb.left + orb.width / 2 - box.left;
+  const cy = orb.top + orb.height / 2 - box.top;
+  const r = orb.width / 2 + 6;
+  svg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+
+  const parts = [];
+  hub.querySelectorAll(".hub-card").forEach((card) => {
+    const rect = card.getBoundingClientRect();
+    const left = rect.right - box.left < cx;
+    const x1 = left ? rect.right - box.left : rect.left - box.left;
+    const y1 = rect.top + rect.height / 2 - box.top;
+    // chegam ao escudo levemente espalhadas, como raios
+    const y2 = cy + (y1 - cy) * 0.32;
+    const x2 = cx + (left ? -1 : 1) * Math.sqrt(Math.max(r * r - (y2 - cy) ** 2, 0));
+    const bend = (x2 - x1) * 0.55;
+    const state = card.classList.contains("paused") ? "paused" : card.classList.contains("on") ? "on" : "";
+    parts.push(`<path class="${state}" d="M${x1},${y1} C${x1 + bend},${y1} ${x2 - bend},${y2} ${x2},${y2}"/>`,
+               `<circle cx="${x1}" cy="${y1}" r="2.5"/>`);
+  });
+  svg.innerHTML = parts.join("");
+}
+
+// Redesenha sempre que o hub muda de tamanho (janela, zoom, fontes carregando...)
+let hubFrame;
+if (window.ResizeObserver && document.getElementById("hub")) {
+  new ResizeObserver(() => {
+    cancelAnimationFrame(hubFrame);
+    hubFrame = requestAnimationFrame(drawHubLines);
+  }).observe(document.getElementById("hub"));
+} else {
+  window.addEventListener("resize", drawHubLines);
+}
+if (document.fonts) document.fonts.ready.then(drawHubLines); // fontes mudam a altura dos cartões
 
 function renderTip(data) {
   // A dica muda conforme o estado: base vazia, IOCs vencidos ou fontes sem chave
@@ -114,9 +188,6 @@ async function loadDashboard() {
   const data = await API.get("/api/stats");
   const q = data.queries;
 
-  const first = q.per_day[0].date.split("-").reverse().slice(0, 2).join("/");
-  const last = q.per_day[q.per_day.length - 1].date.split("-").reverse().slice(0, 2).join("/");
-  document.getElementById("period").textContent = `${first} – ${last}`;
 
   document.getElementById("st-queries").textContent = q.total;
   document.getElementById("st-hitrate").textContent = `${q.cache_hit_rate}%`;
@@ -126,7 +197,7 @@ async function loadDashboard() {
   document.getElementById("st-cache").textContent = data.cache.valid;
   document.getElementById("st-cache-ttl").textContent = `validade de ${data.cache.ttl_hours}h`;
 
-  renderSources(document.getElementById("source-dots"), data.providers);
+  renderHub(data);
   columnChart(document.getElementById("chart-days"), q.per_day);
   renderActivity(document.getElementById("activity"), q.recent);
 

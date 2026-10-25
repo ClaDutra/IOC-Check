@@ -1,0 +1,80 @@
+{
+  "UID": null,
+  "ArgumentType": "domain",
+  "Command": "mx",
+  "IsTransitioned": false,
+  "CommandArgument": "example.com",
+  "TimeRecorded": "2026-10-24T07:29:24.2542065-05:00",
+  "ReportingNameServer": "hera.ns.cloudflare.com",
+  "TimeToComplete": "59",
+  "RelatedIP": null,
+  "ResourceRecordType": 15,
+  "IsEmptySubDomain": false,
+  "SPF_Subaction_Detail": null,
+  "Records": null,
+  "IsEndpoint": false,
+  "HasSubscriptions": false,
+  "AlertgroupSubscriptionId": null,
+  "Failed": [],
+  "Warnings": [],
+  "Passed": [
+    {
+      "ID": 506,
+      "Name": "DNS Record Published",
+      "Info": "DNS Record found",
+      "Url": "https://mxtoolbox.com/Problem/mx/DNS-Record-Published?page=prob_mx&showlogin=1&hidetoc=1&action=mx:example.com",
+      "PublicDescription": null,
+      "IsExcludedByUser": false
+    }
+  ],
+  "Timeouts": [],
+  "Errors": [],
+  "IsError": false,
+  "Information": [
+    {
+      "Pref": "0",
+      "Hostname": ".",
+      "IP Address": "{No A Record}",
+      "TTL": "5 min",
+      "Asn": null,
+      "IsIpV6": null
+    }
+  ],
+  "MultiInformation": [],
+  "Transcript": [
+    {
+      "Transcript": "- - - mx:example.com\r\n\r\n&emsp; 1 a.gtld-servers.net 192.5.6.30 NON-AUTH 3 ms Received 2 Referrals , rcode=NO_ERROR &emsp; example.com.\t172800\tIN\tNS\thera.ns.cloudflare.com,example.com.\t172800\tIN\tNS\telliott.ns.cloudflare.com,\r\n&emsp; 2 hera.ns.cloudflare.com 108.162.192.162 AUTH 3 ms Received 1 Answers , rcode=NO_ERROR &emsp; example.com.\t300\tIN\tMX\t0 .,\r\n\r\n- LookupServer [mx:example.com] 59ms \r\n"
+    }
+  ],
+  "MxRep": 0,
+  "EmailServiceProvider": null,
+  "DnsServiceProvider": null,
+  "DnsServiceProviderIdentifier": null,
+  "CustomData": null,
+  "RelatedLookups": [
+    {
+      "Name": "dns lookup",
+      "URL": "https://mxtoolbox.com/api/v1/lookup/a/example.com",
+      "Command": "a",
+      "CommandArgument": "example.com"
+    },
+    {
+      "Name": "dns check",
+      "URL": "https://mxtoolbox.com/api/v1/lookup/dns/example.com",
+      "Command": "dns",
+      "CommandArgument": "example.com"
+    },
+    {
+      "Name": "spf lookup",
+      "URL": "https://mxtoolbox.com/api/v1/lookup/spf/example.com",
+      "Command": "spf",
+      "CommandArgument": "example.com"
+    },
+    {
+      "Name": "dns propagation",
+      "URL": "https://mxtoolbox.com/api/v1/lookup/mx/example.com:all",
+      "Command": "mx",
+      "CommandArgument": "example.com:all"
+    }
+  ]
+}

@@ -1,51 +1,81 @@
 {% extends "base.html" %}
 {% block title %}Painel{% endblock %}
-{% block panel_class %}has-aside{% endblock %}
+{% block panel_class %}is-dashboard{% endblock %}
 {% block content %}
-<div class="dash-main">
-  <div class="page-head">
-    <div>
-      <h1>Painel</h1>
-      <p class="muted small" id="period"></p>
+<section class="hero hero-hub">
+  <div class="hero-orbits" aria-hidden="true"><span></span><span></span><span></span></div>
+  <form class="hero-search" id="hero-search" action="/check" method="get">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+    <input name="q" placeholder="Cole um IP, domínio, URL ou hash…" autocomplete="off" spellcheck="false" required>
+    <button class="btn btn-primary btn-glow" type="submit">Verificar <span aria-hidden="true">→</span></button>
+  </form>
+  <div class="hub" id="hub">
+    <div class="hub-side left" id="hub-left"></div>
+    <div class="hub-core">
+      <div class="core-rings" aria-hidden="true"><span></span><span></span></div>
+      <div class="core-logo">
+        <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/>
+          <circle cx="11.5" cy="11" r="2.6"/><path d="M13.4 12.9l2.1 2.1"/>
+        </svg>
+      </div>
+      <span class="core-label" id="hub-count">IOC Check</span>
     </div>
-    <div class="source-dots" id="source-dots" title="Fontes de dados"></div>
+    <div class="hub-side right" id="hub-right"></div>
   </div>
+</section>
 
-  <section class="stat-grid">
-    <div class="card stat"><span class="stat-label">Consultas</span><span class="stat-value" id="st-queries">—</span><span class="stat-sub">no total</span></div>
-    <div class="card stat"><span class="stat-label">Do cache</span><span class="stat-value" id="st-hitrate">—</span><span class="stat-sub" id="st-hits"></span></div>
-    <div class="card stat"><span class="stat-label">Minha base</span><span class="stat-value" id="st-iocs">—</span><span class="stat-sub" id="st-iocs-active"></span></div>
-    <div class="card stat"><span class="stat-label">Cache válido</span><span class="stat-value" id="st-cache">—</span><span class="stat-sub" id="st-cache-ttl"></span></div>
+<section class="stat-grid">
+  <div class="card stat">
+    <span class="stat-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span>
+    <span class="stat-label">Consultas</span><span class="stat-value" id="st-queries">—</span><span class="stat-sub">no total</span>
+  </div>
+  <div class="card stat">
+    <span class="stat-icon"><svg viewBox="0 0 24 24"><path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/></svg></span>
+    <span class="stat-label">Do cache</span><span class="stat-value" id="st-hitrate">—</span><span class="stat-sub" id="st-hits"></span>
+  </div>
+  <div class="card stat">
+    <span class="stat-icon"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6M5 12v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6v-6"/></svg></span>
+    <span class="stat-label">Minha base</span><span class="stat-value" id="st-iocs">—</span><span class="stat-sub" id="st-iocs-active"></span>
+  </div>
+  <div class="card stat">
+    <span class="stat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>
+    <span class="stat-label">Cache válido</span><span class="stat-value" id="st-cache">—</span><span class="stat-sub" id="st-cache-ttl"></span>
+  </div>
+</section>
+
+<div class="dash-grid">
+  <section class="card chart-card">
+    <div class="card-head">
+      <div>
+        <h2>Consultas por dia</h2>
+        <p class="muted small">Últimos 14 dias</p>
+      </div>
+      <a class="btn btn-sm" href="/history">Histórico ↗</a>
+    </div>
+    <div id="chart-days" class="column-chart" aria-label="Consultas por dia"></div>
+    <div id="activity"></div>
   </section>
 
-  <div id="chart-days" class="column-chart" aria-label="Consultas por dia"></div>
+  <aside class="dash-aside">
+    <section class="card">
+      <h2>O que você tem verificado?</h2>
+      <div id="chart-verdicts" class="bar-list"></div>
+    </section>
 
-  <div id="activity"></div>
+    <section class="card">
+      <h2>Tipos de indicador</h2>
+      <div id="chart-types" class="bar-list"></div>
+    </section>
+
+    <div class="card tip-card">
+      <span class="tip-glow" aria-hidden="true"></span>
+      <span class="stat-icon"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4.5"/></svg></span>
+      <h3 id="tip-title">Monte sua base</h3>
+      <p id="tip-text">Cadastre os indicadores que você encontra em alertas e relatórios para reconhecê-los nas próximas verificações.</p>
+      <a class="btn btn-light" id="tip-btn" href="{{ url_for('pages.iocs_page') }}">Ver minha base <span aria-hidden="true">↗</span></a>
+    </div>
+  </aside>
 </div>
-
-<aside class="dash-aside">
-  <section>
-    <h2>O que você tem verificado?</h2>
-    <div id="chart-verdicts" class="bar-list"></div>
-  </section>
-
-  <section>
-    <h2>Tipos de indicador</h2>
-    <div id="chart-types" class="bar-list"></div>
-  </section>
-
-  <div class="tip-card">
-    <svg width="96" height="64" viewBox="0 0 96 64" aria-hidden="true">
-      <rect x="4" y="26" width="48" height="34" rx="6" fill="#bfc0d1"/>
-      <rect x="10" y="14" width="40" height="18" rx="4" fill="#60519b"/>
-      <rect x="22" y="38" width="12" height="3" rx="1.5" fill="#fff"/>
-      <path d="M74 16l14 6v10c0 9-6 16-14 20-8-4-14-11-14-20V22l14-6z" fill="#dcd8ee" stroke="#60519b" stroke-width="2"/>
-      <path d="M68 33l4 4 8-9" fill="none" stroke="#60519b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <h3 id="tip-title">Monte sua base</h3>
-    <p id="tip-text">Cadastre os indicadores que você encontra em alertas e relatórios para reconhecê-los nas próximas verificações.</p>
-    <a class="btn btn-dark" id="tip-btn" href="{{ url_for('pages.iocs_page') }}">Ver minha base</a>
-  </div>
-</aside>
 {% endblock %}
 {% block scripts %}<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>{% endblock %}

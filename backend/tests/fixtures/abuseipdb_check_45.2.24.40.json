@@ -1,0 +1,46 @@
+{
+ "data": {
+  "ipAddress": "45.2.24.40",
+  "isPublic": true,
+  "ipVersion": 4,
+  "isWhitelisted": false,
+  "abuseConfidenceScore": 16,
+  "countryCode": "CA",
+  "usageType": "Fixed Line ISP",
+  "isp": "Frontier Networks Inc",
+  "domain": "hellofrontiernetworks.com",
+  "hostnames": [
+   "cbl-45-2-24-40.yyz.frontiernetworks.ca"
+  ],
+  "isTor": false,
+  "countryName": "Canada",
+  "totalReports": 2,
+  "numDistinctUsers": 2,
+  "lastReportedAt": "2026-10-11T08:50:33+00:00",
+  "reports": [
+   {
+    "reportedAt": "2026-10-11T08:50:33+00:00",
+    "comment": "Webpage scraping",
+    "categories": [
+     18,
+     19,
+     21
+    ],
+    "reporterId": 57005,
+    "reporterCountryCode": "DE",
+    "reporterCountryName": "Germany"
+   },
+   {
+    "reportedAt": "2026-10-10T00:19:46+00:00",
+    "comment": "denied traffic to a honeypot network. destination port 23.",
+    "categories": [
+     14,
+     15
+    ],
+    "reporterId": 134282,
+    "reporterCountryCode": "DE",
+    "reporterCountryName": "Germany"
+   }
+  ]
+ }
+}
